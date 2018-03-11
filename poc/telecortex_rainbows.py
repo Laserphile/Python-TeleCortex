@@ -135,6 +135,9 @@ class TelecortexSession(object):
         return full_cmd + "*%d" % checksum
 
     def send_cmd_sync(self, cmd, args=None):
+        while self.ser.in_waiting:
+            self.parse_responses()
+
         full_cmd = self.fmt_cmd(self.linecount, cmd, args)
         if self.do_crc:
             full_cmd = self.add_checksum(full_cmd)
@@ -147,6 +150,9 @@ class TelecortexSession(object):
         self.linecount += 1
 
     def send_cmd_async(self, cmd, args=None):
+        while self.ser.in_waiting:
+            self.parse_responses()
+
         full_cmd = self.fmt_cmd(None, cmd, args)
         if self.do_crc:
             full_cmd = self.add_checksum(full_cmd)
@@ -206,6 +212,9 @@ class TelecortexSession(object):
             offset += pixels_left
 
     def clear_ack_queue(self):
+        while self.ack_queue:
+            self.parse_responses()
+
         logging.info("clearing ack queue: %s" % self.ack_queue.keys())
         self.ack_queue = OrderedDict()
 
@@ -225,6 +234,9 @@ class TelecortexSession(object):
     def set_linenum(self, linenum):
         self.send_cmd_sync("M110", "N%d" % linenum)
         self.linecount = linenum + 1
+
+        while self.ack_queue:
+            self.parse_responses()
 
     def write_line(self, text):
         # byte_array = [six.byte2int(j) for j in text]
@@ -442,7 +454,7 @@ def pix_array2text(*pixels):
     # response = six.binary_type(base64.b64encode(
     #     bytes(pixels)
     # ))
-    logging.debug("pix_text: %s" % repr(response))
+    # logging.debug("pix_text: %s" % repr(response))
     return response
 
 def main():
@@ -484,7 +496,7 @@ def main():
                         [(frameno + pixel) % 256, 255, 127] \
                         for pixel in range(panel_length)
                     ]
-                    logging.info("pixel_list: %s" % pformat(pixel_list))
+                    # logging.info("pixel_list: %s" % pformat(pixel_list))
                     pixel_list = list(itertools.chain(*pixel_list))
                     pixel_str = pix_array2text(*pixel_list)
                     sesh.chunk_payload("M2601", "Q%d" % panel, pixel_str)
