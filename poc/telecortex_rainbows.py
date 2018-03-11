@@ -25,8 +25,8 @@ STREAM_LOG_LEVEL = logging.WARN
 LOG_FILE = ".rainbowz.log"
 PROC_DATA_FILE = "rainbowz_proc.csv"
 GET_DATA_FILE = "rainbowz_get.csv"
-ENABLE_LOG_FILE = True
-ENABLE_PROC_DATA = True
+ENABLE_LOG_FILE = False
+ENABLE_PROC_DATA = False
 ENABLE_GET_DATA = False
 
 logger = logging.getLogger()
@@ -59,7 +59,7 @@ PANEL_LENGTHS = [
 DO_SINGLE = False
 SHOW_RATES = True
 SHOW_STATS_GET = False
-SHOW_STATS_PROC = True
+SHOW_STATS_PROC = False
 
 # TODO: finish this class
 
@@ -88,11 +88,16 @@ class TelecortexSession(object):
         r"PIX_RATE:\s+(?P<pix_rate>[\d\.]+)\s*pps,?\s*"
         r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
     ) % re_loo
+    re_loo_timing = (
+        r"%s"
+        r"TIME:\s+(?P<time>\d+),?\s*"
+    ) % re_loo
     re_loo_get_stats = (
         r"%s"
         r"GET_CMD:\s+(?P<get_cmd>\d+),?\s*"
         r"ENQD:\s+(?P<enqd>\d+),?\s*"
     ) % re_loo
+    # ;LOO: CMD: M 2601, PIXLS:  58, PROC_CMD:   879, PARSE_CMD:   161, PR_PA_CMD:   810
     re_loo_proc_stats = (
         r"%s"
         r"CMD:\s+(?P<cmd>[A-Z] \d+),?\s*"
@@ -262,6 +267,13 @@ class TelecortexSession(object):
                     if SHOW_RATES:
                         logging.warn("FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
                             fps, cmd_rate, pix_rate, "%s / %s" % (queue_occ, queue_max)
+                        ))
+                elif re.match(self.re_loo_timing, line):
+                    match = re.search(self.re_loo_timing, line).groupdict()
+                    loop_time = int(match.get('time'))
+                    if SHOW_RATES:
+                        logging.warn("TIME: %3d" % (
+                            loop_time
                         ))
                 elif re.match(self.re_loo_get_stats, line):
                     match = re.search(self.re_loo_get_stats, line).groupdict()
