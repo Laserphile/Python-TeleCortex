@@ -250,7 +250,7 @@ class TelecortexSession(object):
     def get_line(self):
         line = self.ser.readline()
         line = converters.to_unicode(line)
-        if line:
+        if len(line) > 1:
             if line[-1] == '\n':
                 line = line[:-1]
             if line[-1] == '\r':
