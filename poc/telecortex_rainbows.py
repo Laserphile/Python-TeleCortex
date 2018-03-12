@@ -20,12 +20,13 @@ from kitchen.text import converters
 import six
 
 STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.DEBUG
 
 LOG_FILE = ".rainbowz.log"
 PROC_DATA_FILE = "rainbowz_proc.csv"
 GET_DATA_FILE = "rainbowz_get.csv"
-ENABLE_LOG_FILE = False
+ENABLE_LOG_FILE = True
 ENABLE_PROC_DATA = False
 ENABLE_GET_DATA = False
 
@@ -78,6 +79,7 @@ class TelecortexSession(object):
     chunk_size = 256
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line_ok = r"^N(?P<linenum>\d+):\s*OK"
+    re_resend = r"^RS\s+(?P<linenum>\d+)"
     re_line_error = r"^N(?P<linenum>\d+)\s*" + re_error[1:]
     re_set = r"^;SET: "
     re_loo = r"^;LOO: "
@@ -145,7 +147,7 @@ class TelecortexSession(object):
             self.parse_responses()
 
         self.ack_queue[self.linecount] = (cmd, args)
-        logging.info("sending cmd sync, %s" % repr(full_cmd))
+        logging.debug("sending cmd sync, %s" % repr(full_cmd))
         self.write_line(full_cmd)
         self.linecount += 1
 
@@ -159,7 +161,7 @@ class TelecortexSession(object):
         while self.bytes_left < len(full_cmd):
             self.parse_responses()
 
-        logging.info("sending cmd async %s" % repr(full_cmd))
+        logging.debug("sending cmd async %s" % repr(full_cmd))
         self.write_line(full_cmd)
 
     def reset_board(self):
@@ -212,7 +214,7 @@ class TelecortexSession(object):
             offset += pixels_left
 
     def clear_ack_queue(self):
-        logging.info("clearing ack queue: %s" % self.ack_queue.keys())
+        logging.warning("clearing ack queue: %s" % self.ack_queue.keys())
         self.ack_queue = OrderedDict()
 
     def handle_error(self, errnum, err, linenum=None):
@@ -242,6 +244,16 @@ class TelecortexSession(object):
 
         self.handle_error(errnum, matchdict.get('err', None), linenum)
 
+    def handle_resend_match(self, matchdict):
+        try:
+            linenum = int(matchdict.get('linenum', None))
+        except (ValueError, TypeError):
+            linenum = None
+
+        warning = "resend %d" % linenum
+        logging.error(warning)
+        # TODO: actially resend command
+
     def set_linenum(self, linenum):
         self.send_cmd_sync("M110", "N%d" % linenum)
         self.linecount = linenum + 1
@@ -269,7 +281,7 @@ class TelecortexSession(object):
                 line = line[:-1]
             if line[-1] == '\r':
                 line = line[:-1]
-        logging.info("received line: %s" % line)
+        logging.debug("received line: %s" % line)
         return line
 
     def parse_responses(self):
@@ -288,14 +300,14 @@ class TelecortexSession(object):
                     queue_occ = int(match.get('queue_occ'))
                     queue_max = int(match.get('queue_max'))
                     if SHOW_RATES:
-                        logging.warn("FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
+                        logging.info("FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
                             fps, cmd_rate, pix_rate, "%s / %s" % (queue_occ, queue_max)
                         ))
                 elif re.match(self.re_loo_timing, line):
                     match = re.search(self.re_loo_timing, line).groupdict()
                     loop_time = int(match.get('time'))
                     if SHOW_RATES:
-                        logging.warn("TIME: %3d" % (
+                        logging.info("TIME: %3d" % (
                             loop_time
                         ))
                 elif re.match(self.re_loo_get_stats, line):
@@ -303,7 +315,7 @@ class TelecortexSession(object):
                     get_cmd = int(match.get('get_cmd'))
                     enqd = int(match.get('enqd'))
                     if SHOW_STATS_GET:
-                        logging.warn("GET_CMD: %5d, ENQD: %d" % (
+                        logging.info("GET_CMD: %5d, ENQD: %d" % (
                             get_cmd, enqd
                         ))
                     if ENABLE_GET_DATA:
@@ -319,7 +331,7 @@ class TelecortexSession(object):
                     parse_cmd = int(match.get('parse_cmd'))
                     pr_pa_cmd = int(match.get('pr_pa_cmd'))
                     if SHOW_STATS_PROC:
-                        logging.warn("CMD: %6s, PIXLS: %3d, PROC_CMD: %5d, PARSE_CMD: %5d, PR_PA_CMD: %5d" % (
+                        logging.info("CMD: %6s, PIXLS: %3d, PROC_CMD: %5d, PARSE_CMD: %5d, PR_PA_CMD: %5d" % (
                             cmd, pixls, proc_cmd, parse_cmd, pr_pa_cmd
                         ))
                     if ENABLE_PROC_DATA:
@@ -328,13 +340,13 @@ class TelecortexSession(object):
                                 cmd, proc_cmd, pixls
                             ))
                 elif re.match(self.re_set, line):
-                    logging.warn(line)
+                    logging.info(line)
                 # elif re.match(self.re_enq, line):
-                #     logging.warn(line)
+                #     logging.info(line)
                 # elif re.match(self.re_gco_decoded, line):
-                #     logging.warn(line)
+                #     logging.info(line)
                 # elif re.match(self.re_gco_encoded, line):
-                #     logging.warn(line)
+                #     logging.info(line)
 
             elif line.startswith("N"):
                 action_idle = False
@@ -367,13 +379,18 @@ class TelecortexSession(object):
                 if re.match(self.re_error, line):
                     match = re.search(self.re_error, line).groupdict()
                     self.handle_error_match(match)
+            elif line.startswith("RS"):
+                action_idle = False
+                if re.match(self.re_resend, line):
+                    match = re.search(self.re_resend, line).groupdict()
+                    self.handle_resend_match(match)
             else:
                 logging.warn("line not recognised:\n%s\n" % repr(line.encode('ascii', errors='backslashreplace')))
             if not self.ser.in_waiting:
                 break
             line = self.get_line()
         if idles_recvd > 0:
-            logging.warning('Idle received x %s' % idles_recvd)
+            logging.warn('Idle received x %s' % idles_recvd)
         if action_idle and idles_recvd:
             self.clear_ack_queue()
         # else:
@@ -492,7 +509,7 @@ def main():
                     sesh.send_cmd_sync("M2603","Q%d V%s" % (panel, pixel_str))
                 else:
                     panel_length = PANEL_LENGTHS[panel]
-                    logging.info("panel: %s; panel_length: %s" % (panel, panel_length))
+                    # logging.debug("panel: %s; panel_length: %s" % (panel, panel_length))
                     pixel_list = [
                         [(frameno + pixel) % 256, 255, 127] \
                         for pixel in range(panel_length)
