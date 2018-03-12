@@ -368,7 +368,7 @@ class TelecortexSession(object):
                     match = re.search(self.re_error, line).groupdict()
                     self.handle_error_match(match)
             else:
-                logging.warn("line not recognised:\n%s\n" % repr(line))
+                logging.warn("line not recognised:\n%s\n" % repr(line.encode('ascii', errors='backslashreplace')))
             if not self.ser.in_waiting:
                 break
             line = self.get_line()
