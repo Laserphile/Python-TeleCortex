@@ -19,7 +19,7 @@ from kitchen.text import converters
 
 import six
 
-STREAM_LOG_LEVEL = logging.WARN
+STREAM_LOG_LEVEL = logging.INFO
 # STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.DEBUG
 
