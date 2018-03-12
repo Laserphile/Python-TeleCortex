@@ -215,7 +215,7 @@ class TelecortexSession(object):
         logging.info("clearing ack queue: %s" % self.ack_queue.keys())
         self.ack_queue = OrderedDict()
 
-    def raise_error(self, errnum, err, linenum=None):
+    def handle_error(self, errnum, err, linenum=None):
         warning = "error %s: %s" % (
             errnum,
             err
@@ -226,7 +226,21 @@ class TelecortexSession(object):
                 warning,
                 self.ack_queue.get(linenum, "???")
             )
-        raise UserWarning(warning)
+        logging.error(warning)
+        if errnum not in [11, 19]:
+            raise UserWarning(warning)
+
+    def handle_error_match(self, matchdict):
+        try:
+            linenum = int(matchdict.get('linenum', None))
+        except (ValueError, TypeError):
+            linenum = None
+        try:
+            errnum = int(matchdict.get('errnum', None))
+        except (ValueError, TypeError):
+            errnum = None
+
+        self.handle_error(errnum, matchdict.get('err', None), linenum)
 
     def set_linenum(self, linenum):
         self.send_cmd_sync("M110", "N%d" % linenum)
@@ -347,23 +361,12 @@ class TelecortexSession(object):
                 # example: N126 E010:Line numbers not sequential. Current: 126, Previous: 1
                 elif re.match(self.re_line_error, line):
                     match = re.search(self.re_line_error, line).groupdict()
-                    try:
-                        linenum = int(match.get('linenum'))
-                    except ValueError:
-                        linenum = None
-                    self.raise_error(
-                        match.get('errnum'),
-                        match.get('err'),
-                        linenum
-                    )
+                    self.handle_error_match(match)
             elif line.startswith("E"):
                 action_idle = False
                 if re.match(self.re_error, line):
                     match = re.search(self.re_error, line).groupdict()
-                    self.raise_error(
-                        match.get('errnum'),
-                        match.get('err')
-                    )
+                    self.handle_error_match(match)
             else:
                 logging.warn("line not recognised:\n%s\n" % repr(line))
             if not self.ser.in_waiting:
@@ -375,6 +378,7 @@ class TelecortexSession(object):
             self.clear_ack_queue()
         # else:
         #     logging.debug("did not recieve IDLE")
+
 
     @property
     def bytes_left(self):
