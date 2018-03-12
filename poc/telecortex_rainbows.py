@@ -1,23 +1,21 @@
 from __future__ import unicode_literals
 
-print("Hey there pal, don't forget to `pip install -r poc/requirements.txt`")
-
 import base64
-import logging
-import re
-import os
-import time
 import itertools
-from datetime import datetime
+import logging
+import os
+import re
+import time
 from collections import OrderedDict
+from datetime import datetime
 from pprint import pformat, pprint
 
-import coloredlogs
 import serial
 from serial.tools import list_ports
-from kitchen.text import converters
 
+import coloredlogs
 import six
+from kitchen.text import converters
 
 STREAM_LOG_LEVEL = logging.INFO
 # STREAM_LOG_LEVEL = logging.WARN
@@ -30,19 +28,19 @@ ENABLE_LOG_FILE = True
 ENABLE_PROC_DATA = False
 ENABLE_GET_DATA = False
 
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler(LOG_FILE)
-file_handler.setLevel(logging.DEBUG)
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(STREAM_LOG_LEVEL)
+LOGGER = logging.getLogger()
+LOGGER.setLevel(logging.DEBUG)
+FILE_HANDLER = logging.FileHandler(LOG_FILE)
+FILE_HANDLER.setLevel(logging.DEBUG)
+STREAM_HANDLER = logging.StreamHandler()
+STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
 if os.name != 'nt':
-    stream_handler.setFormatter(coloredlogs.ColoredFormatter())
-stream_handler.addFilter(coloredlogs.HostNameFilter())
-stream_handler.addFilter(coloredlogs.ProgramNameFilter())
+    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
+STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
+STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
 if ENABLE_LOG_FILE:
-    logger.addHandler(file_handler)
-logger.addHandler(stream_handler)
+    LOGGER.addHandler(FILE_HANDLER)
+LOGGER.addHandler(STREAM_HANDLER)
 
 TELECORTEX_DEV = "/dev/tty.usbmodem35"
 # to get these values:
@@ -99,7 +97,6 @@ class TelecortexSession(object):
         r"GET_CMD:\s+(?P<get_cmd>\d+),?\s*"
         r"ENQD:\s+(?P<enqd>\d+),?\s*"
     ) % re_loo
-    # ;LOO: CMD: M 2601, PIXLS:  58, PROC_CMD:   879, PARSE_CMD:   161, PR_PA_CMD:   810
     re_loo_proc_stats = (
         r"%s"
         r"CMD:\s+(?P<cmd>[A-Z] \d+),?\s*"
@@ -229,7 +226,7 @@ class TelecortexSession(object):
                 self.ack_queue.get(linenum, "???")
             )
         logging.error(warning)
-        if errnum not in [11, 19]:
+        if errnum not in [10, 11, 19]:
             raise UserWarning(warning)
 
     def handle_error_match(self, matchdict):
@@ -331,9 +328,16 @@ class TelecortexSession(object):
                     parse_cmd = int(match.get('parse_cmd'))
                     pr_pa_cmd = int(match.get('pr_pa_cmd'))
                     if SHOW_STATS_PROC:
-                        logging.info("CMD: %6s, PIXLS: %3d, PROC_CMD: %5d, PARSE_CMD: %5d, PR_PA_CMD: %5d" % (
-                            cmd, pixls, proc_cmd, parse_cmd, pr_pa_cmd
-                        ))
+                        logging.info(
+                            (
+                                "CMD: %6s, PIXLS: %3d, "
+                                "PROC_CMD: %5d, PARSE_CMD: %5d, "
+                                "PR_PA_CMD: %5d"
+                            ) % (
+                                cmd, pixls, proc_cmd,
+                                parse_cmd, pr_pa_cmd
+                            )
+                        )
                     if ENABLE_PROC_DATA:
                         with open(PROC_DATA_FILE, 'a') as data_file:
                             data_file.write("%6s, %5d, %3d\n" % (
@@ -362,7 +366,8 @@ class TelecortexSession(object):
                     else:
                         logging.warn(
                             (
-                                "received an acknowledgement for an unknown command:\n"
+                                "received an acknowledgement "
+                                "for an unknown command:\n"
                                 "%s\n"
                                 "known linenums: %s"
                             ) % (
@@ -370,7 +375,6 @@ class TelecortexSession(object):
                                 self.ack_queue.keys()
                             )
                         )
-                # example: N126 E010:Line numbers not sequential. Current: 126, Previous: 1
                 elif re.match(self.re_line_error, line):
                     match = re.search(self.re_line_error, line).groupdict()
                     self.handle_error_match(match)
@@ -385,7 +389,11 @@ class TelecortexSession(object):
                     match = re.search(self.re_resend, line).groupdict()
                     self.handle_resend_match(match)
             else:
-                logging.warn("line not recognised:\n%s\n" % repr(line.encode('ascii', errors='backslashreplace')))
+                logging.warn(
+                    "line not recognised:\n%s\n" % (
+                        repr(line.encode('ascii', errors='backslashreplace'))
+                    )
+                )
             if not self.ser.in_waiting:
                 break
             line = self.get_line()
@@ -395,7 +403,6 @@ class TelecortexSession(object):
             self.clear_ack_queue()
         # else:
         #     logging.debug("did not recieve IDLE")
-
 
     @property
     def bytes_left(self):
@@ -422,46 +429,14 @@ class TelecortexSession(object):
     def __nonzero__(self):
         return bool(self.ser)
 
-class AbstractLightScene(object):
-    """
-    Manages an animation on a set of devices which each contain panels
-    """
-    pass
-
-class RGBLightScene(object):
-    """
-    A lightscene which is
-    """
-    pass
-
-class HSVLightScene(object):
-    pass
-
-class SingleRGBLightScene(AbstractLightScene):
-    """
-    Each panel is only a single RGB pixel, as in M2602-M2603
-    """
-
-class SingleHSVLightScene(AbstractLightScene):
-    """
-    Each panel is only a single HSV pixel, as in M2602-M2603
-    """
-
-class PayloadRGBLightScene(AbstractLightScene):
-    """
-    Each panel is lit by an entire RGB payload, as in M2600-M2601
-    """
-
-class PayloadHSVLightScene(AbstractLightScene):
-    """
-    Each panel is lit by an entire HSV payload, as in M2600-M2601
-    """
-
 def pix_array2text(*pixels):
+    """Convert an array of pixels to a base64 encoded unicode string."""
     # logging.debug("pixels: %s" % repr(["%02x" % pixel for pixel in pixels]))
-    # logging.debug("bytes: %s" % repr([six.int2byte(pixel) for pixel in pixels]))
+    # logging.debug(
+    #     "bytes: %s" % repr([six.int2byte(pixel) for pixel in pixels])
+    # )
     pix_bytestring = b''.join([
-        six.int2byte(pixel % 256) \
+        six.int2byte(pixel % 256)
         for pixel in pixels
     ])
     # logging.debug("bytestring: %s" % repr(pix_bytestring))
@@ -475,16 +450,27 @@ def pix_array2text(*pixels):
     # logging.debug("pix_text: %s" % repr(response))
     return response
 
-def main():
-    # TODO: enumerate serial ports, select board by pid/vid
 
-    # Detect serial device:
+def main():
+    """
+    Main.
+
+    Enumerate serial ports
+    Select board by pid/vid
+    Rend some HSV rainbowz
+    Respond to microcontroller
+    """
+
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
     target_device = TELECORTEX_DEV
     for port_info in list_ports.comports():
-        # logging.debug("found serial device vid: %s, pid: %s" % (port_info.vid, port_info.pid))
-        if port_info.vid == TELECORTEX_VID: #and port_info.pid == TELECORTEX_PID:
+        # logging.debug(
+        #     "found serial device vid: %s, pid: %s" % (
+        #         port_info.vid, port_info.pid
+        #     )
+        # )
+        if port_info.vid == TELECORTEX_VID:
             logging.info("found target device: %s" % port_info.device)
             target_device = port_info.device
             break
@@ -492,13 +478,15 @@ def main():
         raise UserWarning("target device not found")
     # Connect to serial
     frameno = 0
-    with serial.Serial(port=target_device, baudrate=TELECORTEX_BAUD, timeout=1) as ser:
+    with serial.Serial(
+        port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
+    ) as ser:
         # logging.debug("settings: %s" % pformat(ser.get_settings()))
         sesh = TelecortexSession(ser)
         sesh.reset_board()
+
         while sesh:
-            # Listen for IDLE or timeout
-            # send some HSV rainbowz
+
             # H = frameno, S = 255 (0xff), V = 127 (0x7f)
             logging.debug("Drawing frame %s" % frameno)
             for panel in range(PANELS):
@@ -506,12 +494,14 @@ def main():
                     pixel_str = pix_array2text(
                         frameno, 255, 127
                     )
-                    sesh.send_cmd_sync("M2603","Q%d V%s" % (panel, pixel_str))
+                    sesh.send_cmd_sync("M2603", "Q%d V%s" % (panel, pixel_str))
                 else:
                     panel_length = PANEL_LENGTHS[panel]
-                    # logging.debug("panel: %s; panel_length: %s" % (panel, panel_length))
+                    # logging.debug(
+                    #     "panel: %s; panel_length: %s" % (panel, panel_length)
+                    # )
                     pixel_list = [
-                        [(frameno + pixel) % 256, 255, 127] \
+                        [(frameno + pixel) % 256, 255, 127]
                         for pixel in range(panel_length)
                     ]
                     # logging.info("pixel_list: %s" % pformat(pixel_list))
@@ -520,6 +510,7 @@ def main():
                     sesh.chunk_payload("M2601", "Q%d" % panel, pixel_str)
             sesh.send_cmd_sync("M2610")
             frameno = (frameno + 1) % 255
+
 
 if __name__ == '__main__':
     main()
