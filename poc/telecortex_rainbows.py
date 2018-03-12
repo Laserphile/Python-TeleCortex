@@ -315,12 +315,12 @@ class TelecortexSession(object):
                             ))
                 elif re.match(self.re_set, line):
                     logging.warn(line)
-                elif re.match(self.re_enq, line):
-                    logging.warn(line)
-                elif re.match(self.re_gco_decoded, line):
-                    logging.warn(line)
-                elif re.match(self.re_gco_encoded, line):
-                    logging.warn(line)
+                # elif re.match(self.re_enq, line):
+                #     logging.warn(line)
+                # elif re.match(self.re_gco_decoded, line):
+                #     logging.warn(line)
+                # elif re.match(self.re_gco_encoded, line):
+                #     logging.warn(line)
 
             elif line.startswith("N"):
                 action_idle = False
