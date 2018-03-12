@@ -212,9 +212,6 @@ class TelecortexSession(object):
             offset += pixels_left
 
     def clear_ack_queue(self):
-        while self.ack_queue:
-            self.parse_responses()
-
         logging.info("clearing ack queue: %s" % self.ack_queue.keys())
         self.ack_queue = OrderedDict()
 
