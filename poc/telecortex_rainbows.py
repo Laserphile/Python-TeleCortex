@@ -247,6 +247,10 @@ class TelecortexSession(object):
             error = "could not resend unknown linenum: %d" % linenum
             logging.error(error)
             # raise UserWarning(error)
+        warning = "resending %s" % ", ".join([
+            "N%s" % line for line in self.ack_queue.keys()
+        ])
+        logging.warning(warning)
         old_queue = self.ack_queue.copy()
         self.clear_ack_queue()
         self.linecount = linenum
