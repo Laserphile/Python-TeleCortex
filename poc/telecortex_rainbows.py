@@ -24,7 +24,7 @@ STREAM_LOG_LEVEL = logging.INFO
 LOG_FILE = ".rainbowz.log"
 PROC_DATA_FILE = "rainbowz_proc.csv"
 GET_DATA_FILE = "rainbowz_get.csv"
-ENABLE_LOG_FILE = True
+ENABLE_LOG_FILE = False
 ENABLE_PROC_DATA = False
 ENABLE_GET_DATA = False
 
@@ -74,7 +74,7 @@ class TelecortexSession(object):
 
     ack_queue_len = ACK_QUEUE_LEN
     ser_buff_size = 1024
-    chunk_size = 230
+    chunk_size = 256
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line_ok = r"^N(?P<linenum>\d+):\s*OK"
