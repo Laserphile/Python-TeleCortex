@@ -6,7 +6,7 @@ import logging
 import os
 import tkinter as tk
 from datetime import datetime
-from math import floor
+from math import floor, ceil
 from pprint import pformat, pprint
 
 import serial
@@ -19,8 +19,9 @@ from PIL.ImageDraw import ImageDraw
 from telecortex_session import TelecortexSession
 from telecortex_utils import pix_array2text
 
+STREAM_LOG_LEVEL = logging.INFO
 STREAM_LOG_LEVEL = logging.WARN
-STREAM_LOG_LEVEL = logging.DEBUG
+# STREAM_LOG_LEVEL = logging.DEBUG
 
 ENABLE_LOG_FILE = True
 
@@ -197,19 +198,26 @@ def blend_pixel(pixel_a, pixel_b, coefficient):
 
 
 def interpolate_pixel(image, coordinates):
-    coordinate_floor = tuple(map(floor, coordinates))
+    coordinate_floor = (
+        int(np.clip(floor(coordinates[0]), 0, image.size[0] - 1)),
+        int(np.clip(floor(coordinates[1]), 0, image.size[1] - 1))
+    )
+    coordinate_ceil = (
+        int(np.clip(ceil(coordinates[0]), 0, image.size[0] - 1)),
+        int(np.clip(ceil(coordinates[1]), 0, image.size[1] - 1))
+    )
 
     pixel_0 = image.getpixel((
         coordinate_floor[0], coordinate_floor[1]
     ))
     pixel_1 = image.getpixel((
-        coordinate_floor[0] + 1, coordinate_floor[1]
+        coordinate_ceil[0], coordinate_floor[1]
     ))
     pixel_2 = image.getpixel((
-        coordinate_floor[0], coordinate_floor[1] + 1
+        coordinate_floor[0], coordinate_ceil[1]
     ))
     pixel_3 = image.getpixel((
-        coordinate_floor[0] + 1, coordinate_floor[1] + 1
+        coordinate_ceil[0], coordinate_ceil[1]
     ))
     pix_coefficients = (
         coordinates[0] - coordinate_floor[0],
@@ -224,13 +232,15 @@ def interpolate_pixel_map(image, pix_map_normalized):
     pixel_list = []
     for pix in pix_map_normalized:
         pix_coordinate = (
-            image.size[0] * pix[0],
-            image.size[1] * pix[1]
+            np.clip(image.size[0] * pix[0], 0, image.size[0] - 1),
+            np.clip(image.size[1] * pix[1], 0, image.size[1] - 1)
         )
         pixel_value = interpolate_pixel(image, pix_coordinate)
         pixel_list.append(pixel_value)
-    logging.debug("pixel_list: %s" % pformat(pixel_list))
-    return list(itertools.chain(*pixel_list))
+    # logging.debug("pixel_list: %s" % pformat(pixel_list))
+    pixel_list = list(itertools.chain(*pixel_list))
+    # logging.debug("pixel_list returned: %s ... " % (pixel_list[:10]))
+    return pixel_list
 
 
 def main():
@@ -285,7 +295,7 @@ def main():
             tk_panel.image = tk_img
             tk_root.update()
 
-            frameno = (frameno + 1) % MAX_HUE
+            frameno = (frameno + 5) % MAX_HUE
 
 
 if __name__ == '__main__':
