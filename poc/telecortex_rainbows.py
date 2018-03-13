@@ -73,7 +73,7 @@ class TelecortexSession(object):
     # TODO: implement soft reset when approaching long int linenum so it can run forever
 
     ack_queue_len = ACK_QUEUE_LEN
-    ser_buff_size = 1024
+    ser_buff_size = 2048
     chunk_size = 256
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
@@ -383,17 +383,15 @@ class TelecortexSession(object):
                     if linenum is not None and linenum in self.ack_queue:
                         del self.ack_queue[linenum]
                     else:
-                        logging.warn(
-                            (
-                                "received an acknowledgement "
-                                "for an unknown command:\n"
-                                "%s\n"
-                                "known linenums: %s"
-                            ) % (
-                                repr(line),
-                                self.ack_queue.keys()
-                            )
-                        )
+                        logging.warn((
+                            "received an acknowledgement "
+                            "for an unknown command:\n"
+                            "%s\n"
+                            "known linenums: %s"
+                        ) % (
+                            repr(line),
+                            self.ack_queue.keys()
+                        ))
                 elif re.match(self.re_line_error, line):
                     match = re.search(self.re_line_error, line).groupdict()
                     self.handle_error_match(match)
