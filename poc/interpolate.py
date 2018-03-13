@@ -133,6 +133,7 @@ PIXEL_MAP = np.array([
     [2613, 1566]
 ])
 
+DOT_RADIUS = 1
 
 def normalize_pix_map(pix_map):
     """
@@ -173,6 +174,19 @@ def fill_rainbows(image, angle=0):
         rgb = ImageColor.getrgb(colour_string)
         # logging.warning("rgb: %s" % (rgb,))
         draw_api.line([(col, 0), (col, IMG_SIZE)], fill=rgb)
+
+def draw_map(test_img, pix_map_normlized):
+    draw_api = ImageDraw(test_img)
+    for pixel in pix_map_normlized:
+        coordinate_from = (
+            int(pixel[0] * IMG_SIZE) - DOT_RADIUS,
+            int(pixel[1] * IMG_SIZE) - DOT_RADIUS
+        )
+        coordinate_to = (
+            int(pixel[0] * IMG_SIZE) + DOT_RADIUS,
+            int(pixel[1] * IMG_SIZE) + DOT_RADIUS
+        )
+        draw_api.ellipse([coordinate_from, coordinate_to], outline=(0, 0, 0))
 
 def blend_pixel(pixel_a, pixel_b, coefficient):
     return (
@@ -258,15 +272,19 @@ def main():
 
         while sesh:
             fill_rainbows(test_img, frameno)
-            tk_img = ImageTk.PhotoImage(test_img)
-            tk_panel.configure(image=tk_img)
-            tk_panel.image = tk_img
-            tk_root.update()
+
             pixel_list = interpolate_pixel_map(test_img, pix_map_normlized)
             pixel_str = pix_array2text(*pixel_list)
             for panel in range(PANELS):
                 sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str)
             sesh.send_cmd_sync("M2610")
+
+            draw_map(test_img, pix_map_normlized)
+            tk_img = ImageTk.PhotoImage(test_img)
+            tk_panel.configure(image=tk_img)
+            tk_panel.image = tk_img
+            tk_root.update()
+
             frameno = (frameno + 1) % MAX_HUE
 
 
