@@ -74,7 +74,8 @@ class TelecortexSession(object):
 
     ack_queue_len = ACK_QUEUE_LEN
     ser_buff_size = 1024
-    chunk_size = 256
+    chunk_size = 230
+
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line_ok = r"^N(?P<linenum>\d+):\s*OK"
     re_resend = r"^RS\s+(?P<linenum>\d+)"
@@ -241,15 +242,26 @@ class TelecortexSession(object):
 
         self.handle_error(errnum, matchdict.get('err', None), linenum)
 
+    def handle_resend(self, linenum):
+        if linenum not in self.ack_queue:
+            error = "could not resend unknown linenum: %d" % linenum
+            logging.error(error)
+            # raise UserWarning(error)
+        old_queue = self.ack_queue.copy()
+        self.clear_ack_queue()
+        self.linecount = linenum
+        for resend_command in old_queue.values():
+            self.send_cmd_sync(*resend_command)
+
+        # TODO: actially resend command
+
     def handle_resend_match(self, matchdict):
         try:
             linenum = int(matchdict.get('linenum', None))
         except (ValueError, TypeError):
             linenum = None
 
-        warning = "resend %d" % linenum
-        logging.error(warning)
-        # TODO: actially resend command
+        self.handle_resend(linenum)
 
     def set_linenum(self, linenum):
         self.send_cmd_sync("M110", "N%d" % linenum)
