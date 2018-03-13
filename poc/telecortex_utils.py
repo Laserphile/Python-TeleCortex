@@ -1,22 +1,10 @@
+"""Utilities for Proofs of Concept."""
+
 from __future__ import unicode_literals
 
 import base64
-import itertools
-import logging
-import os
-import re
-import time
-from collections import OrderedDict
-from datetime import datetime
-from pprint import pformat, pprint
-
-import serial
-from serial.tools import list_ports
-
-import coloredlogs
 import six
-from kitchen.text import converters
-from telecortex_session import TelecortexSession
+
 
 def pix_array2text(*pixels):
     """Convert an array of pixels to a base64 encoded unicode string."""
