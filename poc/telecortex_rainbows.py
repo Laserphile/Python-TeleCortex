@@ -227,7 +227,9 @@ class TelecortexSession(object):
                 self.ack_queue.get(linenum, "???")
             )
         logging.error(warning)
-        if errnum not in [10, 11, 19]:
+        if errnum in [10] and linenum is not None:
+            self.handle_resend(linenum)
+        elif errnum not in [11, 19]:
             raise UserWarning(warning)
 
     def handle_error_match(self, matchdict):
@@ -248,14 +250,15 @@ class TelecortexSession(object):
             logging.error(error)
             # raise UserWarning(error)
         warning = "resending %s" % ", ".join([
-            "N%s" % line for line in self.ack_queue.keys()
+            "N%s" % line for line in self.ack_queue.keys() if line >= linenum
         ])
         logging.warning(warning)
         old_queue = self.ack_queue.copy()
         self.clear_ack_queue()
         self.linecount = linenum
-        for resend_command in old_queue.values():
-            self.send_cmd_sync(*resend_command)
+        for resend_linenum, resend_command in old_queue.items():
+            if resend_linenum >= linenum:
+                self.send_cmd_sync(*resend_command)
 
         # TODO: actially resend command
 
