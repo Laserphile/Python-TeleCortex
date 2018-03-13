@@ -4,16 +4,17 @@
 import itertools
 import logging
 import os
+import tkinter as tk
 from datetime import datetime
-from pprint import pformat, pprint
 from math import floor
-import numpy as np
+from pprint import pformat, pprint
 
 import serial
 from serial.tools import list_ports
 
 import coloredlogs
-from PIL import Image, ImageColor
+import numpy as np
+from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
 from telecortex_session import TelecortexSession
 from telecortex_utils import pix_array2text
@@ -214,7 +215,7 @@ def interpolate_pixel_map(image, pix_map_normalized):
         )
         pixel_value = interpolate_pixel(image, pix_coordinate)
         pixel_list.append(pixel_value)
-    # logging.debug("pixel_list: %s" % pformat(pixel_list))
+    logging.debug("pixel_list: %s" % pformat(pixel_list))
     return list(itertools.chain(*pixel_list))
 
 
@@ -242,6 +243,12 @@ def main():
     logging.info("pix_map_normlized:\n %s" % pformat(pix_map_normlized))
 
     test_img = Image.new('RGB', (IMG_SIZE, IMG_SIZE))
+
+    tk_root = tk.Tk()
+    tk_img = ImageTk.PhotoImage(test_img)
+    tk_panel = tk.Label(tk_root, image=tk_img)
+    tk_panel.pack(side="bottom", fill="both", expand="yes")
+
     frameno = 0
     with serial.Serial(
         port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
@@ -251,12 +258,17 @@ def main():
 
         while sesh:
             fill_rainbows(test_img, frameno)
+            tk_img = ImageTk.PhotoImage(test_img)
+            tk_panel.configure(image=tk_img)
+            tk_panel.image = tk_img
+            tk_root.update()
             pixel_list = interpolate_pixel_map(test_img, pix_map_normlized)
             pixel_str = pix_array2text(*pixel_list)
             for panel in range(PANELS):
                 sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str)
             sesh.send_cmd_sync("M2610")
             frameno = (frameno + 1) % MAX_HUE
+
 
 if __name__ == '__main__':
     main()
