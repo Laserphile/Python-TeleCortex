@@ -20,7 +20,7 @@ from telecortex_session import TelecortexSession
 from telecortex_utils import pix_array2text
 
 STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.DEBUG
 
 ENABLE_LOG_FILE = True
