@@ -1,6 +1,4 @@
-"""
-Rainbow test script
-"""
+"""Rainbow test script."""
 
 from __future__ import unicode_literals
 
@@ -21,11 +19,7 @@ STREAM_LOG_LEVEL = logging.INFO
 # STREAM_LOG_LEVEL = logging.DEBUG
 
 LOG_FILE = ".rainbowz.log"
-PROC_DATA_FILE = "rainbowz_proc.csv"
-GET_DATA_FILE = "rainbowz_get.csv"
 ENABLE_LOG_FILE = False
-ENABLE_PROC_DATA = False
-ENABLE_GET_DATA = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -48,7 +42,6 @@ TELECORTEX_DEV = "/dev/tty.usbmodem35"
 TELECORTEX_VID = 0x16C0
 TELECORTEX_PID = 0x0483
 TELECORTEX_BAUD = 57600
-ACK_QUEUE_LEN = 3
 PANELS = 4
 PANEL_LENGTHS = [
     316, 260, 260, 260
@@ -70,11 +63,6 @@ def main():
 
     target_device = TELECORTEX_DEV
     for port_info in list_ports.comports():
-        # logging.debug(
-        #     "found serial device vid: %s, pid: %s" % (
-        #         port_info.vid, port_info.pid
-        #     )
-        # )
         if port_info.vid == TELECORTEX_VID:
             logging.info("found target device: %s" % port_info.device)
             target_device = port_info.device

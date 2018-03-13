@@ -17,15 +17,18 @@ import coloredlogs
 import six
 from kitchen.text import converters
 
+# TODO: soft reset when linenum approach long int so it can run forever
+
+
 class TelecortexSession(object):
     """
     Manages a serial session with a Telecortex device.
+
     When commands are sent that require acknowledgement (synchronous),
     they are queued in ack_queue until the acknowledgement or error for that
     command is received.
     When
     """
-    # TODO: implement soft reset when approaching long int linenum so it can run forever
 
     ser_buff_size = 2048
     chunk_size = 256
