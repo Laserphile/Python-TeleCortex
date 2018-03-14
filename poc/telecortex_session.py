@@ -185,9 +185,12 @@ class TelecortexSession(object):
                 self.ack_queue.get(linenum, "???")
             )
         logging.error(warning)
-        if linenum is not None and errnum in [10, 19]:
+        if errnum in [10, 19]:
+            pass
+            # resend request will come later
+        elif errnum in [11] and linenum is not None:
             self.handle_resend(linenum)
-        elif errnum not in [10, 11, 19]:
+        else:
             raise UserWarning(warning)
 
     def handle_error_match(self, matchdict):
