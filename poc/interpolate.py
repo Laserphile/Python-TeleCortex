@@ -28,6 +28,7 @@ MAX_HUE = 360
 
 LOG_FILE = ".interpolate.log"
 ENABLE_LOG_FILE = True
+ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -241,10 +242,11 @@ def main():
 
     test_img = Image.new('RGB', (IMG_SIZE, IMG_SIZE))
 
-    tk_root = tk.Tk()
-    tk_img = ImageTk.PhotoImage(test_img)
-    tk_panel = tk.Label(tk_root, image=tk_img)
-    tk_panel.pack(side="bottom", fill="both", expand="yes")
+    if ENABLE_PREVIEW:
+        tk_root = tk.Tk()
+        tk_img = ImageTk.PhotoImage(test_img)
+        tk_panel = tk.Label(tk_root, image=tk_img)
+        tk_panel.pack(side="bottom", fill="both", expand="yes")
 
     frameno = 0
     with serial.Serial(
@@ -262,11 +264,12 @@ def main():
                 sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str)
             sesh.send_cmd_sync("M2610")
 
-            draw_map(test_img, pix_map_normlized)
-            tk_img = ImageTk.PhotoImage(test_img)
-            tk_panel.configure(image=tk_img)
-            tk_panel.image = tk_img
-            tk_root.update()
+            if ENABLE_PREVIEW:
+                draw_map(test_img, pix_map_normlized)
+                tk_img = ImageTk.PhotoImage(test_img)
+                tk_panel.configure(image=tk_img)
+                tk_panel.image = tk_img
+                tk_root.update()
 
             frameno = (frameno + 5) % MAX_HUE
 
