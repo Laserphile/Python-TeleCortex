@@ -9,6 +9,7 @@ import time
 from collections import OrderedDict
 from datetime import datetime
 from pprint import pformat, pprint
+from copy import deepcopy
 
 import serial
 from serial.tools import list_ports
@@ -30,7 +31,7 @@ class TelecortexSession(object):
     When
     """
 
-    ser_buff_size = 2048
+    ser_buff_size = 512
     chunk_size = 256
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
@@ -184,9 +185,9 @@ class TelecortexSession(object):
                 self.ack_queue.get(linenum, "???")
             )
         logging.error(warning)
-        if errnum in [10] and linenum is not None:
+        if linenum is not None and errnum in [10, 19]:
             self.handle_resend(linenum)
-        elif errnum not in [11, 19]:
+        elif errnum not in [10, 11, 19]:
             raise UserWarning(warning)
 
     def handle_error_match(self, matchdict):
@@ -210,11 +211,11 @@ class TelecortexSession(object):
             "N%s" % line for line in self.ack_queue.keys() if line >= linenum
         ])
         logging.warning(warning)
-        old_queue = self.ack_queue.copy()
+        old_queue = deepcopy(self.ack_queue)
         self.clear_ack_queue()
         self.linecount = linenum
         for resend_linenum, resend_command in old_queue.items():
-            if resend_linenum >= linenum:
+            if resend_linenum >= self.linecount:
                 self.send_cmd_sync(*resend_command)
 
         # TODO: actially resend command
