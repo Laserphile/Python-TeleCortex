@@ -27,7 +27,7 @@ IMG_SIZE = 512
 MAX_HUE = 360
 
 LOG_FILE = ".interpolate.log"
-ENABLE_LOG_FILE = False
+ENABLE_LOG_FILE = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
