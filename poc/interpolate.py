@@ -8,6 +8,7 @@ import tkinter as tk
 from datetime import datetime
 from math import floor, ceil
 from pprint import pformat, pprint
+from time import time as time_now
 
 import serial
 from serial.tools import list_ports
@@ -51,6 +52,7 @@ PANELS = 4
 PANEL_LENGTHS = [
     316, 260, 260, 260
 ]
+TARGET_FRAMERATE = 20
 
 # Pixel mapping from pixel_map_helper.py in touch_dome
 
@@ -248,7 +250,7 @@ def main():
         tk_panel = tk.Label(tk_root, image=tk_img)
         tk_panel.pack(side="bottom", fill="both", expand="yes")
 
-    frameno = 0
+    start_time = time_now()
     with serial.Serial(
         port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
     ) as ser:
@@ -256,6 +258,7 @@ def main():
         sesh.reset_board()
 
         while sesh:
+            frameno = ((time_now() - start_time) * TARGET_FRAMERATE * 5) % 360
             fill_rainbows(test_img, frameno)
 
             pixel_list = interpolate_pixel_map(test_img, pix_map_normlized)
