@@ -53,6 +53,7 @@ PANEL_LENGTHS = [
     316, 260, 260, 260
 ]
 TARGET_FRAMERATE = 20
+ANIM_SPEED = 2
 
 # Pixel mapping from pixel_map_helper.py in touch_dome
 
@@ -258,7 +259,7 @@ def main():
         sesh.reset_board()
 
         while sesh:
-            frameno = ((time_now() - start_time) * TARGET_FRAMERATE * 5) % 360
+            frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % 360
             fill_rainbows(test_img, frameno)
 
             pixel_list = interpolate_pixel_map(test_img, pix_map_normlized)
