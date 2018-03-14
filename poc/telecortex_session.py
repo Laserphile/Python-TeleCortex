@@ -188,8 +188,9 @@ class TelecortexSession(object):
         if errnum in [10, 19]:
             pass
             # resend request will come later
-        elif errnum in [11] and linenum is not None:
-            self.handle_resend(linenum)
+        elif errnum in [11]:
+            pass
+            # can't resend after receive acknowledgement
         else:
             raise UserWarning(warning)
 
