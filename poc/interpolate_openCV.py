@@ -34,7 +34,7 @@ MAX_ANGLE = 360
 
 LOG_FILE = ".interpolate.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = False
+ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -52,8 +52,10 @@ LOGGER.addHandler(STREAM_HANDLER)
 
 TELECORTEX_DEV = "/dev/tty.usbmodem35"
 TARGET_FRAMERATE = 20
-ANIM_SPEED = 3
+ANIM_SPEED = 10
 MAIN_WINDOW = 'image_window'
+# INTERPOLATION_TYPE = 'bilinear'
+INTERPOLATION_TYPE = 'nearest'
 
 # Pixel mapping from pixel_map_helper.py in touch_dome
 
@@ -238,34 +240,45 @@ def blend_pixel(pixel_a, pixel_b, coefficient):
 
 
 def interpolate_pixel(image, coordinates):
+
+    if INTERPOLATION_TYPE == 'nearest':
+        return image[
+            int(round(coordinates[0])),
+            int(round(coordinates[1]))
+        ]
+
     coordinate_floor = (
         int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1)),
         int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1))
     )
-    coordinate_ceil = (
+    # Otherwise bilinear
+    coordinate_floor = (
+        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1)),
+        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1))
+    )
+    coordinate_ceiling = (
         int(np.clip(ceil(coordinates[0]), 0, image.shape[0] - 1)),
         int(np.clip(ceil(coordinates[1]), 0, image.shape[1] - 1))
     )
-
-    pixel_0 = image[
-        coordinate_floor[0], coordinate_floor[1]
-    ]
-    pixel_1 = image[
-        coordinate_ceil[0], coordinate_floor[1]
-    ]
-    pixel_2 = image[
-        coordinate_floor[0], coordinate_ceil[1]
-    ]
-    pixel_3 = image[
-        coordinate_ceil[0], coordinate_ceil[1]
-    ]
-    pix_coefficients = (
+    coordinate_fractional = (
         coordinates[0] - coordinate_floor[0],
         coordinates[1] - coordinate_floor[1]
     )
-    pixel_4 = blend_pixel(pixel_0, pixel_1, pix_coefficients[0])
-    pixel_5 = blend_pixel(pixel_2, pixel_3, pix_coefficients[0])
-    return blend_pixel(pixel_4, pixel_5, pix_coefficients[1])
+    pixel_tl = image[
+        coordinate_floor[0], coordinate_floor[1]
+    ]
+    pixel_bl = image[
+        coordinate_ceiling[0], coordinate_floor[1]
+    ]
+    pixel_tr = image[
+        coordinate_floor[0], coordinate_ceiling[1]
+    ]
+    pixel_br = image[
+        coordinate_ceiling[0], coordinate_ceiling[1]
+    ]
+    pixel_l = blend_pixel(pixel_tl, pixel_bl, coordinate_fractional[1])
+    pixel_r = blend_pixel(pixel_tr, pixel_br, coordinate_fractional[1])
+    return blend_pixel(pixel_l, pixel_r, coordinate_fractional[0])
 
 
 def interpolate_pixel_map(image, pix_map_normalized):
@@ -337,6 +350,7 @@ def main():
             pixel_str_smol = pix_array2text(*pixel_list_smol)
             pixel_str_big = pix_array2text(*pixel_list_big)
             for panel in range(PANELS):
+                # import pudb; pudb.set_trace()
                 if PANEL_LENGTHS[panel] == max(PANEL_LENGTHS):
                     sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_big)
                 if PANEL_LENGTHS[panel] == min(PANEL_LENGTHS):
