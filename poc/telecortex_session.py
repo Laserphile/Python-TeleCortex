@@ -25,7 +25,7 @@ from kitchen.text import converters
 # python -m serial.tools.list_ports
 
 TELECORTEX_VID = 0x16C0
-TELECORTEX_BAUD = 1000000
+TELECORTEX_BAUD = 57600
 PANEL_LENGTHS = [
     316, 260, 260, 260
 ]
