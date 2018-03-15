@@ -257,8 +257,6 @@ class TelecortexSession(object):
             if resend_linenum >= self.linecount:
                 self.send_cmd_sync(*resend_command)
 
-        # TODO: actially resend command
-
     def handle_resend_match(self, matchdict):
         try:
             linenum = int(matchdict.get('linenum', None))
