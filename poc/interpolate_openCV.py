@@ -28,7 +28,7 @@ from telecortex_utils import pix_array2text
 # STREAM_LOG_LEVEL = logging.WARN
 STREAM_LOG_LEVEL = logging.ERROR
 
-IMG_SIZE = 512
+IMG_SIZE = 32
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 

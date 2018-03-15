@@ -22,11 +22,11 @@ from telecortex_session import (TelecortexSession, TELECORTEX_VID,
 from telecortex_utils import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.INFO
-# STREAM_LOG_LEVEL = logging.WARN
+STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.DEBUG
-STREAM_LOG_LEVEL = logging.ERROR
+# STREAM_LOG_LEVEL = logging.ERROR
 
-IMG_SIZE = 512
+IMG_SIZE = 32
 MAX_HUE = 360
 
 LOG_FILE = ".interpolate.log"

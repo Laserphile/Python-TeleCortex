@@ -183,8 +183,30 @@ class TelecortexSession(object):
             offset += pixels_left
 
     def clear_ack_queue(self):
-        logging.warning("clearing ack queue: %s" % self.ack_queue.keys())
+        logging.info("clearing ack queue: %s" % self.ack_queue.keys())
         self.ack_queue = OrderedDict()
+
+    def handle_line_ok_match(self, match):
+        try:
+            linenum = int(match.get('linenum'))
+        except ValueError:
+            linenum = None
+        if linenum is not None:
+            deletable_linenums = []
+            for ack_linenum in self.ack_queue.keys():
+                if ack_linenum <= linenum:
+                    deletable_linenums.append(ack_linenum)
+            for ack_linenum in deletable_linenums:
+                del self.ack_queue[ack_linenum]
+        else:
+            logging.warn((
+                "received an acknowledgement "
+                "for an unknown command: %s"
+                "known linenums: %s"
+            ) % (
+                self.last_line,
+                self.ack_queue.keys()
+            ))
 
     def handle_error(self, errnum, err, linenum=None):
         warning = "error %s: %s" % (
@@ -273,6 +295,7 @@ class TelecortexSession(object):
             if line[-1] == '\r':
                 line = line[:-1]
         logging.debug("received line: %s" % line)
+        self.last_line = line
         return line
 
     def parse_responses(self):
@@ -303,22 +326,7 @@ class TelecortexSession(object):
                 # either "N\d+: OK" or N\d+: E\d+:
                 if re.match(self.re_line_ok, line):
                     match = re.search(self.re_line_ok, line).groupdict()
-                    try:
-                        linenum = int(match.get('linenum'))
-                    except ValueError:
-                        linenum = None
-                    if linenum is not None and linenum in self.ack_queue:
-                        del self.ack_queue[linenum]
-                    else:
-                        logging.warn((
-                            "received an acknowledgement "
-                            "for an unknown command:\n"
-                            "%s\n"
-                            "known linenums: %s"
-                        ) % (
-                            repr(line),
-                            self.ack_queue.keys()
-                        ))
+                    self.handle_line_ok_match(match)
                 elif re.match(self.re_line_error, line):
                     match = re.search(self.re_line_error, line).groupdict()
                     self.handle_error_match(match)
