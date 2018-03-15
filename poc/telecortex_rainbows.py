@@ -19,7 +19,7 @@ STREAM_LOG_LEVEL = logging.INFO
 # STREAM_LOG_LEVEL = logging.DEBUG
 
 LOG_FILE = ".rainbowz.log"
-ENABLE_LOG_FILE = False
+ENABLE_LOG_FILE = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -44,7 +44,7 @@ TELECORTEX_PID = 0x0483
 TELECORTEX_BAUD = 57600
 PANELS = 4
 PANEL_LENGTHS = [
-    316, 260, 260, 260
+    260, 260, 316, 260
 ]
 
 DO_SINGLE = False
@@ -59,6 +59,7 @@ def main():
     Rend some HSV rainbowz
     Respond to microcontroller
     """
+
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
     target_device = TELECORTEX_DEV

@@ -31,8 +31,10 @@ class TelecortexSession(object):
     When
     """
 
-    ser_buff_size = 512
+    # TODO: group idle debug prints
+
     chunk_size = 256
+    ser_buff_size = 2 * (chunk_size + 4)
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line_ok = r"^N(?P<linenum>\d+):\s*OK"
@@ -277,7 +279,7 @@ class TelecortexSession(object):
                     fps = int(match.get('fps'))
                     queue_occ = int(match.get('queue_occ'))
                     queue_max = int(match.get('queue_max'))
-                    logging.info(
+                    logging.error(
                         "FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
                             fps, cmd_rate, pix_rate,
                             "%s / %s" % (queue_occ, queue_max)
@@ -329,7 +331,7 @@ class TelecortexSession(object):
                 break
             line = self.get_line()
         if idles_recvd > 0:
-            logging.warn('Idle received x %s' % idles_recvd)
+            logging.info('Idle received x %s' % idles_recvd)
         if action_idle and idles_recvd:
             self.clear_ack_queue()
         # else:
