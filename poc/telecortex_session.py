@@ -46,6 +46,7 @@ class TelecortexSession(object):
 
     chunk_size = 256
     ser_buff_size = 2 * (chunk_size + 4)
+    max_ack_queue = 5
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line_ok = r"^N(?P<linenum>\d+):\s*OK"
@@ -367,6 +368,8 @@ class TelecortexSession(object):
 
     @property
     def ready(self):
+        if len(self.ack_queue) > self.max_ack_queue:
+            return False
         ser_buff_len = 0
         for linenum, ack_cmd in self.ack_queue.items():
             if ack_cmd[0] == "M110":
