@@ -17,12 +17,14 @@ import coloredlogs
 import numpy as np
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
-from telecortex_session import TelecortexSession
+from telecortex_session import (TelecortexSession, TELECORTEX_VID,
+                                TELECORTEX_BAUD, PANELS, PANEL_LENGTHS)
 from telecortex_utils import pix_array2text
 
-STREAM_LOG_LEVEL = logging.INFO
+# STREAM_LOG_LEVEL = logging.INFO
 # STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.DEBUG
+STREAM_LOG_LEVEL = logging.ERROR
 
 IMG_SIZE = 512
 MAX_HUE = 360
@@ -46,14 +48,8 @@ if ENABLE_LOG_FILE:
 LOGGER.addHandler(STREAM_HANDLER)
 
 TELECORTEX_DEV = "/dev/tty.usbmodem35"
-TELECORTEX_VID = 0x16C0
-TELECORTEX_BAUD = 57600
-PANELS = 4
-PANEL_LENGTHS = [
-    260, 260, 316, 260
-]
 TARGET_FRAMERATE = 20
-ANIM_SPEED = 2
+ANIM_SPEED = 3
 
 # Pixel mapping from pixel_map_helper.py in touch_dome
 
@@ -220,7 +216,9 @@ def fill_rainbows(image, angle=0):
         # logging.warning("rgb: %s" % (rgb,))
         draw_api.line([(col, 0), (col, IMG_SIZE)], fill=rgb)
 
-def draw_map(test_img, pix_map_normlized):
+def draw_map(test_img, pix_map_normlized, outline=None):
+    if outline is None:
+        outline = (0, 0, 0)
     draw_api = ImageDraw(test_img)
     for pixel in pix_map_normlized:
         coordinate_from = (
@@ -231,7 +229,7 @@ def draw_map(test_img, pix_map_normlized):
             int(pixel[0] * IMG_SIZE) + DOT_RADIUS,
             int(pixel[1] * IMG_SIZE) + DOT_RADIUS
         )
-        draw_api.ellipse([coordinate_from, coordinate_to], outline=(0, 0, 0))
+        draw_api.ellipse([coordinate_from, coordinate_to], outline=outline)
 
 def blend_pixel(pixel_a, pixel_b, coefficient):
     return (
@@ -307,8 +305,8 @@ def main():
     if not target_device:
         raise UserWarning("target device not found")
 
-    pix_map_normlized = normalize_pix_map(PIXEL_MAP_SMOL)
-    logging.info("pix_map_normlized:\n %s" % pformat(pix_map_normlized))
+    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
+    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
     test_img = Image.new('RGB', (IMG_SIZE, IMG_SIZE))
 
@@ -329,14 +327,20 @@ def main():
             frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % 360
             fill_rainbows(test_img, frameno)
 
-            pixel_list = interpolate_pixel_map(test_img, pix_map_normlized)
-            pixel_str = pix_array2text(*pixel_list)
+            pixel_list_smol = interpolate_pixel_map(test_img, pix_map_normlized_smol)
+            pixel_list_big = interpolate_pixel_map(test_img, pix_map_normlized_big)
+            pixel_str_smol = pix_array2text(*pixel_list_smol)
+            pixel_str_big = pix_array2text(*pixel_list_big)
             for panel in range(PANELS):
-                sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str)
+                if PANEL_LENGTHS[panel] == max(PANEL_LENGTHS):
+                    sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_big)
+                if PANEL_LENGTHS[panel] == min(PANEL_LENGTHS):
+                    sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_smol)
             sesh.send_cmd_sync("M2610")
 
             if ENABLE_PREVIEW:
-                draw_map(test_img, pix_map_normlized)
+                draw_map(test_img, pix_map_normlized_smol)
+                draw_map(test_img, pix_map_normlized_big, outline=(255, 255, 255))
                 tk_img = ImageTk.PhotoImage(test_img)
                 tk_panel.configure(image=tk_img)
                 tk_panel.image = tk_img

@@ -20,6 +20,17 @@ from kitchen.text import converters
 
 # TODO: soft reset when linenum approach long int so it can run forever
 
+# to get these values:
+# pip install pyserial
+# python -m serial.tools.list_ports
+
+TELECORTEX_VID = 0x16C0
+TELECORTEX_BAUD = 57600
+PANEL_LENGTHS = [
+    316, 260, 260, 260
+]
+PANELS = len(PANEL_LENGTHS)
+
 
 class TelecortexSession(object):
     """

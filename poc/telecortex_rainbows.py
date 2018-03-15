@@ -11,12 +11,14 @@ import serial
 from serial.tools import list_ports
 
 import coloredlogs
-from telecortex_session import TelecortexSession
+from telecortex_session import (TelecortexSession, TELECORTEX_VID,
+                                TELECORTEX_BAUD, PANELS, PANEL_LENGTHS)
 from telecortex_utils import pix_array2text
 
-STREAM_LOG_LEVEL = logging.INFO
+# STREAM_LOG_LEVEL = logging.INFO
 # STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.DEBUG
+STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".rainbowz.log"
 ENABLE_LOG_FILE = True
@@ -36,17 +38,6 @@ if ENABLE_LOG_FILE:
 LOGGER.addHandler(STREAM_HANDLER)
 
 TELECORTEX_DEV = "/dev/tty.usbmodem35"
-# to get these values:
-# pip install pyserial
-# python -m serial.tools.list_ports
-TELECORTEX_VID = 0x16C0
-TELECORTEX_PID = 0x0483
-TELECORTEX_BAUD = 57600
-PANELS = 4
-PANEL_LENGTHS = [
-    260, 260, 316, 260
-]
-
 DO_SINGLE = False
 
 
