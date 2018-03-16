@@ -1,57 +1,9 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+"""Module for mapping panel pixels to animation pixels."""
 
-import itertools
-import logging
-import os
-import tkinter as tk
-from datetime import datetime
-from math import floor, ceil
-from pprint import pformat, pprint
-from time import time as time_now
-
-import serial
-from serial.tools import list_ports
-
-import coloredlogs
 import numpy as np
-from PIL import Image, ImageColor, ImageTk
-from PIL.ImageDraw import ImageDraw
-from telecortex_session import (TelecortexSession, TELECORTEX_VID,
-                                TELECORTEX_BAUD, PANELS, PANEL_LENGTHS)
-from telecortex_utils import pix_array2text
-
-# STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
-# STREAM_LOG_LEVEL = logging.DEBUG
-# STREAM_LOG_LEVEL = logging.ERROR
-
-IMG_SIZE = 32
-MAX_HUE = 360
-
-LOG_FILE = ".interpolate.log"
-ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = False
-
-LOGGER = logging.getLogger()
-LOGGER.setLevel(logging.DEBUG)
-FILE_HANDLER = logging.FileHandler(LOG_FILE)
-FILE_HANDLER.setLevel(logging.DEBUG)
-STREAM_HANDLER = logging.StreamHandler()
-STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
-if os.name != 'nt':
-    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
-STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
-STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
-LOGGER.addHandler(STREAM_HANDLER)
-
-TELECORTEX_DEV = "/dev/tty.usbmodem35"
-TARGET_FRAMERATE = 20
-ANIM_SPEED = 3
 
 # Pixel mapping from pixel_map_helper.py in touch_dome
+
 
 PIXEL_MAP_SMOL = np.array([
     [963, 45], [965, 106], [1032, 171], [966, 171], [901, 171], [904, 237],
@@ -173,14 +125,8 @@ PIXEL_MAP_BIG = np.array([
     [2494, 2050]
 ])
 
-DOT_RADIUS = 1
-
-
 def normalize_pix_map(pix_map):
-    """
-    Return a normalized copy of `pixel map` so that ∀(x, y); x, y ∈ [0,1]
-    """
-
+    """Return a normalized copy of `pixel map` all x, y between 0, 1."""
     normalized = pix_map.astype(np.float64)
 
     pix_min_x = normalized.min(0)[0]
@@ -191,163 +137,16 @@ def normalize_pix_map(pix_map):
     pix_breadth_y = pix_max_y - pix_min_y
     pix_breadth_max = max(pix_breadth_x, pix_breadth_y)
 
-    logging.debug(
-        "mins: (%4d, %4d), maxs: (%4d, %4d), breadth: (%4d, %4d)" % (
-            pix_min_x, pix_min_y, pix_max_x, pix_max_y,
-            pix_breadth_x, pix_breadth_y
-        )
-    )
+    # logging.debug(
+    #     "mins: (%4d, %4d), maxs: (%4d, %4d), breadth: (%4d, %4d)" % (
+    #         pix_min_x, pix_min_y, pix_max_x, pix_max_y,
+    #         pix_breadth_x, pix_breadth_y
+    #     )
+    # )
 
     normalized[..., [0, 1]] -= [pix_min_x, pix_min_y]
     normalized *= (1/pix_breadth_max)
 
-    # TODO: probably need to centre this somehow
+    # TODO: probably need to centre this better
 
     return normalized
-
-
-def fill_rainbows(image, angle=0):
-    draw_api = ImageDraw(image)
-    for col in range(IMG_SIZE):
-        hue = (col * MAX_HUE / IMG_SIZE + angle) % MAX_HUE
-        colour_string = "hsl(%d, 100%%, 50%%)" % (hue)
-        # logging.warning("colour_string: %s" % colour_string)
-        rgb = ImageColor.getrgb(colour_string)
-        # logging.warning("rgb: %s" % (rgb,))
-        draw_api.line([(col, 0), (col, IMG_SIZE)], fill=rgb)
-
-def draw_map(test_img, pix_map_normlized, outline=None):
-    if outline is None:
-        outline = (0, 0, 0)
-    draw_api = ImageDraw(test_img)
-    for pixel in pix_map_normlized:
-        coordinate_from = (
-            int(pixel[0] * IMG_SIZE) - DOT_RADIUS,
-            int(pixel[1] * IMG_SIZE) - DOT_RADIUS
-        )
-        coordinate_to = (
-            int(pixel[0] * IMG_SIZE) + DOT_RADIUS,
-            int(pixel[1] * IMG_SIZE) + DOT_RADIUS
-        )
-        draw_api.ellipse([coordinate_from, coordinate_to], outline=outline)
-
-def blend_pixel(pixel_a, pixel_b, coefficient):
-    return (
-        int(np.interp(coefficient, [0, 1], [pixel_a[0], pixel_b[0]])),
-        int(np.interp(coefficient, [0, 1], [pixel_a[1], pixel_b[1]])),
-        int(np.interp(coefficient, [0, 1], [pixel_a[2], pixel_b[2]])),
-    )
-
-
-def interpolate_pixel(image, coordinates):
-    coordinate_floor = (
-        int(np.clip(floor(coordinates[0]), 0, image.size[0] - 1)),
-        int(np.clip(floor(coordinates[1]), 0, image.size[1] - 1))
-    )
-    coordinate_ceil = (
-        int(np.clip(ceil(coordinates[0]), 0, image.size[0] - 1)),
-        int(np.clip(ceil(coordinates[1]), 0, image.size[1] - 1))
-    )
-
-    pixel_0 = image.getpixel((
-        coordinate_floor[0], coordinate_floor[1]
-    ))
-    pixel_1 = image.getpixel((
-        coordinate_ceil[0], coordinate_floor[1]
-    ))
-    pixel_2 = image.getpixel((
-        coordinate_floor[0], coordinate_ceil[1]
-    ))
-    pixel_3 = image.getpixel((
-        coordinate_ceil[0], coordinate_ceil[1]
-    ))
-    pix_coefficients = (
-        coordinates[0] - coordinate_floor[0],
-        coordinates[1] - coordinate_floor[1]
-    )
-    pixel_4 = blend_pixel(pixel_0, pixel_1, pix_coefficients[0])
-    pixel_5 = blend_pixel(pixel_2, pixel_3, pix_coefficients[0])
-    return blend_pixel(pixel_4, pixel_5, pix_coefficients[1])
-
-
-def interpolate_pixel_map(image, pix_map_normalized):
-    pixel_list = []
-    for pix in pix_map_normalized:
-        pix_coordinate = (
-            np.clip(image.size[0] * pix[0], 0, image.size[0] - 1),
-            np.clip(image.size[1] * pix[1], 0, image.size[1] - 1)
-        )
-        pixel_value = interpolate_pixel(image, pix_coordinate)
-        pixel_list.append(pixel_value)
-    # logging.debug("pixel_list: %s" % pformat(pixel_list))
-    pixel_list = list(itertools.chain(*pixel_list))
-    # logging.debug("pixel_list returned: %s ... " % (pixel_list[:10]))
-    return pixel_list
-
-
-def main():
-    """
-    Main.
-
-    Enumerate serial ports
-    Select board by pid/vid
-    Rend some perpendicular rainbowz
-    Respond to microcontroller
-    """
-    logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
-
-    target_device = TELECORTEX_DEV
-    for port_info in list_ports.comports():
-        if port_info.vid == TELECORTEX_VID:
-            logging.info("found target device: %s" % port_info.device)
-            target_device = port_info.device
-            break
-    if not target_device:
-        raise UserWarning("target device not found")
-
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
-
-    test_img = Image.new('RGB', (IMG_SIZE, IMG_SIZE))
-
-    if ENABLE_PREVIEW:
-        tk_root = tk.Tk()
-        tk_img = ImageTk.PhotoImage(test_img)
-        tk_panel = tk.Label(tk_root, image=tk_img)
-        tk_panel.pack(side="bottom", fill="both", expand="yes")
-
-    start_time = time_now()
-    with serial.Serial(
-        port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
-    ) as ser:
-        sesh = TelecortexSession(ser)
-        sesh.reset_board()
-
-        while sesh:
-            frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % 360
-            fill_rainbows(test_img, frameno)
-
-            pixel_list_smol = interpolate_pixel_map(test_img, pix_map_normlized_smol)
-            pixel_list_big = interpolate_pixel_map(test_img, pix_map_normlized_big)
-            pixel_str_smol = pix_array2text(*pixel_list_smol)
-            pixel_str_big = pix_array2text(*pixel_list_big)
-            for panel in range(PANELS):
-                if PANEL_LENGTHS[panel] == max(PANEL_LENGTHS):
-                    sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_big)
-                if PANEL_LENGTHS[panel] == min(PANEL_LENGTHS):
-                    sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_smol)
-            sesh.send_cmd_sync("M2610")
-
-            if ENABLE_PREVIEW:
-                draw_map(test_img, pix_map_normlized_smol)
-                draw_map(test_img, pix_map_normlized_big, outline=(255, 255, 255))
-                tk_img = ImageTk.PhotoImage(test_img)
-                tk_panel.configure(image=tk_img)
-                tk_panel.image = tk_img
-                tk_root.update()
-
-            frameno = (frameno + 5) % MAX_HUE
-
-
-if __name__ == '__main__':
-    main()

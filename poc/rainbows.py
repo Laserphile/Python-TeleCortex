@@ -1,4 +1,4 @@
-"""Rainbow test script."""
+"""Simple Rainbow test script with no mapping required. """
 
 from __future__ import unicode_literals
 
@@ -11,9 +11,10 @@ import serial
 from serial.tools import list_ports
 
 import coloredlogs
-from telecortex_session import (TelecortexSession, TELECORTEX_VID,
-                                TELECORTEX_BAUD, PANELS, PANEL_LENGTHS)
-from telecortex_utils import pix_array2text
+from context import telecortex
+from telecortex.session import (PANEL_LENGTHS, PANELS, TELECORTEX_BAUD,
+                                TELECORTEX_VID, find_serial_dev, TelecortexSession)
+from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.INFO
 # STREAM_LOG_LEVEL = logging.WARN
@@ -50,15 +51,11 @@ def main():
     Rend some HSV rainbowz
     Respond to microcontroller
     """
-
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    target_device = TELECORTEX_DEV
-    for port_info in list_ports.comports():
-        if port_info.vid == TELECORTEX_VID:
-            logging.info("found target device: %s" % port_info.device)
-            target_device = port_info.device
-            break
+    target_device = find_serial_dev(TELECORTEX_VID)
+    if target_device is None:
+        target_device = TELECORTEX_DEV
     if not target_device:
         raise UserWarning("target device not found")
     # Connect to serial

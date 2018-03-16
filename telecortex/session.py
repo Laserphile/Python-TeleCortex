@@ -31,6 +31,19 @@ PANEL_LENGTHS = [
 ]
 PANELS = len(PANEL_LENGTHS)
 
+def find_serial_dev(vid, pid=None):
+    """
+    Given a Vendor ID and (optional) Product ID, enumerate the serial ports
+    until a matching device is found.
+    """
+    for port_info in list_ports.comports():
+        if port_info.vid != vid:
+            continue
+        if pid is not None and port_info.pid != pid:
+            continue
+        logging.info("found target device: %s" % port_info.device)
+        target_device = port_info.device
+        return target_device
 
 class TelecortexSession(object):
     """
@@ -381,3 +394,7 @@ class TelecortexSession(object):
 
     def __nonzero__(self):
         return bool(self.ser)
+
+class TelecortexSessionManager(object):
+    pass
+    # TODO: This
