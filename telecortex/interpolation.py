@@ -78,6 +78,9 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
             np.clip(image.shape[1] * pix[1], 0, image.shape[1] - 1)
         )
         pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
+        if len(pixel_value) > 3:
+            # BRGA fix
+            pixel_value = tuple(pixel_value[:3])
         pixel_list.append(pixel_value)
     # logging.debug("pixel_list: %s" % pformat(pixel_list))
     pixel_list = list(itertools.chain(*pixel_list))
