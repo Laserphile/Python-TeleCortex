@@ -1,0 +1,8 @@
+numpy==1.13.3
+coloredlogs==9.0
+opencv_python==3.3.0.10
+six==1.11.0
+kitchen==1.2.5
+Pillow==5.0.0
+mss==3.1.2
+pyserial==3.4
