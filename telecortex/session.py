@@ -22,7 +22,10 @@ from kitchen.text import converters
 
 # to get these values:
 # pip install pyserial
-# python -m serial.tools.list_ports
+# python -m serial.tools.list_ports --verbose
+
+DEFAULT_BAUDRATE = 57600
+DEFAULT_TIMEOUT = 1
 
 TELECORTEX_VID = 0x16C0
 TELECORTEX_BAUD = 57600
@@ -31,15 +34,28 @@ PANEL_LENGTHS = [
 ]
 PANELS = len(PANEL_LENGTHS)
 
-def find_serial_dev(vid, pid=None):
+def find_serial_dev(vid, pid=None, ser=None):
     """
     Given a Vendor ID and (optional) Product ID, enumerate the serial ports
     until a matching device is found.
     """
+    logging.debug(
+        "Checking for: VID: %s, PID: %s, SER: %s",
+        repr(vid), repr(pid), repr(ser)
+    )
     for port_info in list_ports.comports():
+        logging.debug(
+            "found a device: VID: %s, PID: %s, SER: %s",
+            repr(port_info.vid), repr(port_info.pid), repr(port_info.serial_number)
+        )
         if port_info.vid != vid:
+            logging.debug("vid not match %s | %s", vid, port_info.vid)
             continue
         if pid is not None and port_info.pid != pid:
+            logging.debug("pid not match %s | %s", pid, port_info.pid)
+            continue
+        if ser is not None and port_info.serial_number != ser:
+            logging.debug("ser not match %s | %s", ser, port_info.serial_number)
             continue
         logging.info("found target device: %s" % port_info.device)
         target_device = port_info.device
@@ -395,6 +411,51 @@ class TelecortexSession(object):
     def __nonzero__(self):
         return bool(self.ser)
 
+    def close(self):
+        self.ser.close()
+
+"""
+servers is a list of objects containing information about a server's configuration.
+"""
+
 class TelecortexSessionManager(object):
-    pass
     # TODO: This
+    def __init__(self, servers):
+        self.servers = servers
+        self.sessions = OrderedDict()
+        self.refresh_connections()
+
+    def refresh_connections(self):
+        """
+        Use information from `self.servers` to ensure all sessions are connected.
+        """
+        for server_id, server_info in self.servers.items():
+            if server_id in self.sessions:
+                if self.sessions[server_id]:
+                    # we're fine
+                    continue
+                if not self.sessions[server_id]:
+                    # session is dead, kill it
+                    self.sessions[server_id].close()
+                    del self.sessions[server_id]
+
+            if self.sessions.get(server_id) is not None:
+                continue
+
+            # if session does not exist, create a new one
+            port = find_serial_dev(
+                vid=server_info['vid'],
+                pid=server_info['pid'],
+                ser=server_info['ser']
+            )
+
+            if not port:
+                raise UserWarning("target device not found for server: %s" % server_info)
+
+            ser = serial.Serial(
+                port=port,
+                baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
+                timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
+            )
+            self.sessions[server_id] = TelecortexSession(ser)
+            self.sessions[server_id].reset_board()
