@@ -15,14 +15,15 @@ from serial.tools import list_ports
 import coloredlogs
 import cv2
 import numpy as np
+from context import telecortex
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
-from context import telecortex
-from telecortex.session import (PANEL_LENGTHS, PANELS, TELECORTEX_BAUD,
-                                TELECORTEX_VID, find_serial_dev, TelecortexSession)
-from telecortex.util import pix_array2text
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_SMOL, PIXEL_MAP_BIG, normalize_pix_map)
+from telecortex.mapping import PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map
+from telecortex.session import (PANEL_LENGTHS, PANELS, TELECORTEX_BAUD,
+                                TELECORTEX_VID, TelecortexSession,
+                                find_serial_dev)
+from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
