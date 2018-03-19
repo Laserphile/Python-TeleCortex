@@ -34,7 +34,7 @@ PANEL_LENGTHS = [
 ]
 PANELS = len(PANEL_LENGTHS)
 
-def find_serial_dev(vid, pid=None, ser=None):
+def find_serial_dev(vid=None, pid=None, ser=None):
     """
     Given a Vendor ID and (optional) Product ID, enumerate the serial ports
     until a matching device is found.
@@ -45,16 +45,17 @@ def find_serial_dev(vid, pid=None, ser=None):
     )
     for port_info in list_ports.comports():
         logging.debug(
-            "found a device: VID: %s, PID: %s, SER: %s",
-            repr(port_info.vid), repr(port_info.pid), repr(port_info.serial_number)
+            "found a device: \ninfo: %s\nvars: %s",
+            port_info.usb_info(),
+            vars(port_info)
         )
-        if port_info.vid != vid:
+        if vid is not None and port_info.vid != vid:
             logging.debug("vid not match %s | %s", vid, port_info.vid)
             continue
         if pid is not None and port_info.pid != pid:
             logging.debug("pid not match %s | %s", pid, port_info.pid)
             continue
-        if ser is not None and port_info.serial_number != ser:
+        if ser is not None and port_info.serial_number != str(ser):
             logging.debug("ser not match %s | %s", ser, port_info.serial_number)
             continue
         logging.info("found target device: %s" % port_info.device)
@@ -443,11 +444,11 @@ class TelecortexSessionManager(object):
                 continue
 
             # if session does not exist, create a new one
-            port = find_serial_dev(
-                vid=server_info['vid'],
-                pid=server_info['pid'],
-                ser=server_info['ser']
-            )
+            dev_kwargs = {}
+            for key in ['vid', 'pid', 'ser']:
+                if key in server_info:
+                    dev_kwargs[key] = server_info[key]
+            port = find_serial_dev(**dev_kwargs)
 
             if not port:
                 raise UserWarning("target device not found for server: %s" % server_info)
@@ -459,3 +460,26 @@ class TelecortexSessionManager(object):
             )
             self.sessions[server_id] = TelecortexSession(ser)
             self.sessions[server_id].reset_board()
+
+    def close(self):
+        for server_id, session in self.sessions.items():
+            session.close()
+        self.sessions = OrderedDict()
+
+    def __exit__(self):
+        self.close()
+
+
+SERVERS = OrderedDict([
+    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600}),
+    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058600', 'baud':57600})
+])
+
+def main():
+    with TelecortexSessionManager(SERVERS) as manager:
+        pass
+
+if __name__ == '__main__':
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    main()
