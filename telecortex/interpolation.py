@@ -26,38 +26,42 @@ def interpolate_pixel(image, coordinates, interp_type=None):
 
     if interp_type == 'nearest':
         return image[
-            int(round(coordinates[0])),
-            int(round(coordinates[1]))
+            int(round(coordinates[1])),
+            int(round(coordinates[0]))
         ]
 
     coordinate_floor = (
-        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1)),
-        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1))
+        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1)),
+        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1))
     )
     # Otherwise bilinear
     coordinate_floor = (
-        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1)),
-        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1))
+        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1)),
+        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1))
     )
     coordinate_ceiling = (
-        int(np.clip(ceil(coordinates[0]), 0, image.shape[0] - 1)),
-        int(np.clip(ceil(coordinates[1]), 0, image.shape[1] - 1))
+        int(np.clip(ceil(coordinates[1]), 0, image.shape[1] - 1)),
+        int(np.clip(ceil(coordinates[0]), 0, image.shape[0] - 1))
     )
     coordinate_fractional = (
-        coordinates[0] - coordinate_floor[0],
-        coordinates[1] - coordinate_floor[1]
+        coordinates[1] - coordinate_floor[1],
+        coordinates[0] - coordinate_floor[0]
     )
     pixel_tl = image[
-        coordinate_floor[0], coordinate_floor[1]
+        coordinate_floor[1],
+        coordinate_floor[0]
     ]
     pixel_bl = image[
-        coordinate_ceiling[0], coordinate_floor[1]
+        coordinate_floor[1],
+        coordinate_ceiling[0]
     ]
     pixel_tr = image[
-        coordinate_floor[0], coordinate_ceiling[1]
+        coordinate_ceiling[1],
+        coordinate_floor[0]
     ]
     pixel_br = image[
-        coordinate_ceiling[0], coordinate_ceiling[1]
+        coordinate_ceiling[1],
+        coordinate_ceiling[0],
     ]
     pixel_l = blend_pixel(pixel_tl, pixel_bl, coordinate_fractional[1])
     pixel_r = blend_pixel(pixel_tr, pixel_br, coordinate_fractional[1])
