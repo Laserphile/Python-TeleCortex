@@ -490,6 +490,10 @@ class TelecortexSessionManager(object):
         Use information from `self.servers` to ensure all sessions are connected.
         """
         for server_id, server_info in self.servers.items():
+            logging.info(
+                "looking for server_id %d with info: %s" %
+                (server_id, server_info)
+            )
             if server_id in self.sessions:
                 if self.sessions[server_id]:
                     # we're fine
@@ -511,7 +515,6 @@ class TelecortexSessionManager(object):
             if IGNORE_SERIAL_NO:
                 del dev_kwargs['ser']
 
-            # port = find_serial_dev(**dev_kwargs)
             ports = query_serial_dev(**dev_kwargs)
             if not ports:
                 raise UserWarning("target device not found for server: %s" % server_info)
@@ -530,7 +533,7 @@ class TelecortexSessionManager(object):
                         ser.close()
                         continue
                 # if doesn't match controller id then close port and skip
-
+                logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
 
 
@@ -548,16 +551,18 @@ class TelecortexSessionManager(object):
 
 
 SERVERS = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
-    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
-    (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3})
+    # (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
+    # (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
+    (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3}),
+    (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4})
 ])
 
 def main():
-    with TelecortexSessionManager(SERVERS) as manager:
-        for sesh in manager.sessions.values():
-            for panel_number, _ in enumerate(PANEL_LENGTHS):
-                sesh.send_cmd_sync("M2602", "Q%d V////" % panel_number)
+    manager = TelecortexSessionManager(SERVERS)
+    for sesh in manager.sessions.values():
+        for panel_number, _ in enumerate(PANEL_LENGTHS):
+            sesh.send_cmd_sync("M2602", "Q%d V////" % panel_number)
+        sesh.send_cmd_sync("M2610")
 
 
 if __name__ == '__main__':

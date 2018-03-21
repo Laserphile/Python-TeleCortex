@@ -23,14 +23,14 @@ from telecortex.session import (PANEL_LENGTHS, TELECORTEX_BAUD, SERVERS,
                                 TelecortexSessionManager)
 from telecortex.util import pix_array2text
 
+# STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
-# STREAM_LOG_LEVEL = logging.WARN
-STREAM_LOG_LEVEL = logging.DEBUG
+STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".sesssion.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
+ENABLE_PREVIEW = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -50,7 +50,7 @@ IMG_SIZE = 64
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
-ANIM_SPEED = 10
+ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
@@ -58,7 +58,12 @@ DOT_RADIUS = 0
 
 PANELS = [
     # (0, 0, 'big'),
-    (2, 2, 'smol')
+    (2, 1, 'smol'),
+    (2, 2, 'smol'),
+    (2, 3, 'smol'),
+    (3, 1, 'smol'),
+    (3, 2, 'smol'),
+    (3, 3, 'smol')
 ]
 
 def fill_rainbows(image, angle=0.0):
@@ -67,6 +72,18 @@ def fill_rainbows(image, angle=0.0):
         rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
         # logging.debug("rgb: %s" % (rgb,))
         cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
+    return image
+
+def draw_map(image, pix_map_normlized, outline=None):
+    """Given an image and a normalized pixel map, draw the map on the image."""
+    if outline is None:
+        outline = (0, 0, 0)
+    for pixel in pix_map_normlized:
+        pix_coordinate = (
+            int(image.shape[0] * pixel[0]),
+            int(image.shape[1] * pixel[1])
+        )
+        cv2.circle(image, pix_coordinate, DOT_RADIUS, outline, 1)
     return image
 
 def main():
@@ -114,6 +131,16 @@ def main():
                 "M2600", "Q%d" % panel_number, pixel_str
             )
             manager.sessions[server_id].send_cmd_sync('M2610')
+
+            if ENABLE_PREVIEW:
+                draw_map(test_img, pix_map_normlized_smol)
+                draw_map(test_img, pix_map_normlized_big, outline=(255, 255, 255))
+                cv2.imshow(MAIN_WINDOW, test_img)
+            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
+                key = cv2.waitKey(2) & 0xFF
+                if key == 27:
+                    cv2.destroyAllWindows()
+                    break
 
 
 if __name__ == '__main__':
