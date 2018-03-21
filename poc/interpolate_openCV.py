@@ -27,15 +27,15 @@ from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
-# STREAM_LOG_LEVEL = logging.WARN
-STREAM_LOG_LEVEL = logging.ERROR
+STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.ERROR
 
 IMG_SIZE = 64
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 
 LOG_FILE = ".interpolate.log"
-ENABLE_LOG_FILE = False
+ENABLE_LOG_FILE = True
 ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()

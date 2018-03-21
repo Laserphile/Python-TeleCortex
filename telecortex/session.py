@@ -27,6 +27,9 @@ from kitchen.text import converters
 DEFAULT_BAUDRATE = 57600
 DEFAULT_TIMEOUT = 1
 
+# Fix for this issue:
+IGNORE_SERIAL_NO = True
+
 TELECORTEX_VID = 0x16C0
 TELECORTEX_BAUD = 57600
 PANEL_LENGTHS = [
@@ -62,6 +65,38 @@ def find_serial_dev(vid=None, pid=None, ser=None):
         target_device = port_info.device
         return target_device
 
+def query_serial_dev(vid=None, pid=None, ser=None):
+    """
+    Given a Vendor ID and (optional) Product ID, return the serial ports which
+    match these parameters
+    """
+    logging.debug(
+        "Querying for: VID: %s, PID: %s, SER: %s",
+        repr(vid), repr(pid), repr(ser)
+    )
+    matching_devs = []
+    for port_info in list_ports.comports():
+        logging.debug(
+            "found a device: \ninfo: %s\nvars: %s",
+            port_info.usb_info(),
+            vars(port_info)
+        )
+        if vid is not None and port_info.vid != vid:
+            logging.debug("vid not match %s | %s", vid, port_info.vid)
+            continue
+        if pid is not None and port_info.pid != pid:
+            logging.debug("pid not match %s | %s", pid, port_info.pid)
+            continue
+        if ser is not None and port_info.serial_number != str(ser):
+            logging.debug("ser not match %s | %s", ser, port_info.serial_number)
+            continue
+        logging.info("found target device: %s" % port_info.device)
+        target_device = port_info.device
+        matching_devs.append(target_device)
+    return matching_devs
+
+
+
 class TelecortexSession(object):
     """
     Manages a serial session with a Telecortex device.
@@ -82,6 +117,7 @@ class TelecortexSession(object):
     re_line_ok = r"^N(?P<linenum>\d+):\s*OK"
     re_resend = r"^RS\s+(?P<linenum>\d+)"
     re_line_error = r"^N(?P<linenum>\d+)\s*" + re_error[1:]
+    re_line_response = r"^N(?P<linenum>\d+):\s*(?P<response>\S+)"
     re_set = r"^;SET: "
     re_loo = r"^;LOO: "
     re_loo_rates = (
@@ -122,6 +158,7 @@ class TelecortexSession(object):
         self.linecount = linecount
         # commands which expect acknowledgement
         self.ack_queue = OrderedDict()
+        self.responses = OrderedDict()
 
     def fmt_cmd(self, linenum=None, cmd=None, args=None):
         cmd = " ".join(filter(None, [cmd, args]))
@@ -182,6 +219,17 @@ class TelecortexSession(object):
             self.get_line()
 
         self.set_linenum(0)
+
+    def get_cid(self):
+        linenum = self.linecount
+        self.send_cmd_sync("P2205")
+        while linenum not in self.responses:
+            self.parse_responses()
+        response = self.responses.get(linenum)
+        assert \
+            response.startswith('S'), \
+            "unknown response format for N%d: %s" % (linenum, response)
+        return response[1:]
 
     def chunk_payload(self, cmd, static_args, payload, sync=True):
         offset = 0;
@@ -272,6 +320,14 @@ class TelecortexSession(object):
 
         self.handle_error(errnum, matchdict.get('err', None), linenum)
 
+    def handle_line_response_match(self, matchdict):
+        try:
+            linenum = int(matchdict.get('linenum', None))
+        except (ValueError, TypeError):
+            linenum = None
+        # TODO: finish this
+        self.responses[linenum] = matchdict.get('response', '')
+
     def handle_resend(self, linenum):
         if linenum not in self.ack_queue:
             error = "could not resend unknown linenum: %d" % linenum
@@ -359,6 +415,9 @@ class TelecortexSession(object):
                 elif re.match(self.re_line_error, line):
                     match = re.search(self.re_line_error, line).groupdict()
                     self.handle_error_match(match)
+                elif re.match(self.re_line_response, line):
+                    match = re.search(self.re_line_response, line).groupdict()
+                    self.handle_line_response_match(match)
             elif line.startswith("E"):
                 action_idle = False
                 if re.match(self.re_error, line):
@@ -448,36 +507,58 @@ class TelecortexSessionManager(object):
             for key in ['vid', 'pid', 'ser']:
                 if key in server_info:
                     dev_kwargs[key] = server_info[key]
-            port = find_serial_dev(**dev_kwargs)
 
-            if not port:
+            if IGNORE_SERIAL_NO:
+                del dev_kwargs['ser']
+
+            # port = find_serial_dev(**dev_kwargs)
+            ports = query_serial_dev(**dev_kwargs)
+            if not ports:
                 raise UserWarning("target device not found for server: %s" % server_info)
 
-            ser = serial.Serial(
-                port=port,
-                baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
-                timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
-            )
-            self.sessions[server_id] = TelecortexSession(ser)
-            self.sessions[server_id].reset_board()
+            for port in ports:
+                ser = serial.Serial(
+                    port=port,
+                    baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
+                    timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
+                )
+                sesh = TelecortexSession(ser)
+                sesh.reset_board()
+                if server_info.get('cid') is not None:
+                    cid = int(sesh.get_cid());
+                    if cid != server_info.get('cid'):
+                        ser.close()
+                        continue
+                # if doesn't match controller id then close port and skip
+
+                self.sessions[server_id] = sesh
+
 
     def close(self):
         for server_id, session in self.sessions.items():
             session.close()
         self.sessions = OrderedDict()
 
-    def __exit__(self):
+    def __enter__(self, *args, **kwargs):
+        # TODO: this
+        pass
+
+    def __exit__(self, *args, **kwargs):
         self.close()
 
 
 SERVERS = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600}),
-    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058600', 'baud':57600})
+    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
+    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
+    (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3})
 ])
 
 def main():
     with TelecortexSessionManager(SERVERS) as manager:
-        pass
+        for sesh in manager.sessions.values():
+            for panel_number, _ in enumerate(PANEL_LENGTHS):
+                sesh.send_cmd_sync("M2602", "Q%d V////" % panel_number)
+
 
 if __name__ == '__main__':
     logger = logging.getLogger()

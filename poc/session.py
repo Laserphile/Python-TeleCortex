@@ -18,7 +18,7 @@ import numpy as np
 from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map
-from telecortex.session import (PANEL_LENGTHS, TELECORTEX_BAUD,
+from telecortex.session import (PANEL_LENGTHS, TELECORTEX_BAUD, SERVERS,
                                 TelecortexSession,
                                 TelecortexSessionManager)
 from telecortex.util import pix_array2text
@@ -56,15 +56,9 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
-
-SERVERS = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600}),
-    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058600', 'baud':57600})
-])
-
 PANELS = [
-    (0, 0, 'big'),
-    (1, 2, 'smol')
+    # (0, 0, 'big'),
+    (2, 2, 'smol')
 ]
 
 def fill_rainbows(image, angle=0.0):
@@ -116,8 +110,7 @@ def main():
             elif size == 'smol':
                 pixel_str = pixel_str_smol
 
-            import pudb; pudb.set_trace()
-            manager.sessions[server_id].send_chunk_payload(
+            manager.sessions[server_id].chunk_payload(
                 "M2600", "Q%d" % panel_number, pixel_str
             )
             manager.sessions[server_id].send_cmd_sync('M2610')
