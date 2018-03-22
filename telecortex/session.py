@@ -398,6 +398,8 @@ class TelecortexSession(object):
         idles_recvd = 0
         action_idle = True
         while True:
+            if not line:
+                continue
             if line.startswith("IDLE"):
                 idles_recvd += 1
             elif line.startswith(";"):
@@ -494,6 +496,7 @@ class TelecortexSessionManager(object):
     def __init__(self, servers):
         self.servers = servers
         self.sessions = OrderedDict()
+        self.device_id_cache = OrderedDict()
         self.refresh_connections()
 
     def refresh_connections(self):
@@ -531,18 +534,22 @@ class TelecortexSessionManager(object):
                 raise UserWarning("target device not found for server: %s" % server_info)
 
             for port in ports:
-                ser = serial.Serial(
-                    port=port,
-                    baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
-                    timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
-                )
-                sesh = TelecortexSession(ser)
-                sesh.reset_board()
-                if server_info.get('cid') is not None:
+                if(port in self.device_id_cache):
+                    cid = self.device_id_cache[port]
+                else:
+                    ser = serial.Serial(
+                        port=port,
+                        baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
+                        timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
+                    )
+                    sesh = TelecortexSession(ser)
+                    sesh.reset_board()
                     cid = int(sesh.get_cid());
-                    if cid != server_info.get('cid'):
-                        ser.close()
-                        continue
+                    self.device_id_cache[port] = cid
+                if server_info.get('cid') is not None \
+                and cid != server_info.get('cid'):
+                    ser.close()
+                    continue
                 # if doesn't match controller id then close port and skip
                 logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
