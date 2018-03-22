@@ -21,9 +21,9 @@ from PIL import Image, ImageColor, ImageGrab, ImageTk
 from PIL.ImageDraw import ImageDraw
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map
-from telecortex.session import (PANEL_LENGTHS, PANELS, TELECORTEX_BAUD,
-                                TELECORTEX_VID, TelecortexSession,
-                                find_serial_dev)
+from telecortex.session import (PANEL_LENGTHS, TELECORTEX_BAUD, SERVERS,
+                                TelecortexSession,
+                                TelecortexSessionManager)
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -59,7 +59,7 @@ ANIM_SPEED = 10
 MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'bilinear'
 # INTERPOLATION_TYPE = 'nearest'
-DOT_RADIUS = 0
+DOT_RADIUS = 2
 
 def draw_map(image, pix_map_normlized, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""
@@ -73,7 +73,18 @@ def draw_map(image, pix_map_normlized, outline=None):
         cv2.circle(image, pix_coordinate, DOT_RADIUS, outline, 1)
     return image
 
-MON = {'top': 10, 'left': 0, 'width': 500, 'height': 500}
+MON = {'top': 100, 'left': 0, 'width': 200, 'height': 200}
+
+PANELS = [
+    # (0, 0, 'big'),
+    (2, 1, 'smol'),
+    (2, 2, 'smol'),
+    # (2, 3, 'smol'),
+    (3, 1, 'smol'),
+    (3, 2, 'smol'),
+    (3, 3, 'smol')
+]
+
 
 def main():
     """
@@ -86,11 +97,7 @@ def main():
     """
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    target_device = find_serial_dev(TELECORTEX_VID)
-    if target_device is None:
-        target_device = TELECORTEX_DEV
-    if not target_device:
-        raise UserWarning("target device not found")
+    manager = TelecortexSessionManager(SERVERS)
 
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
@@ -113,27 +120,31 @@ def main():
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
 
     start_time = time_now()
-    with serial.Serial(
-        port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
-    ) as ser:
-        sesh = TelecortexSession(ser)
-        sesh.reset_board()
 
-        while sesh:
-            # TODO: fill frame with camera feed here
+    while manager:
 
-            img = np.array(sct.grab(MON))
-            cv2.imshow(MAIN_WINDOW, np.array(img))
+        img = np.array(sct.grab(MON))
 
-            pixel_list_big = interpolate_pixel_map(
-                img, pix_map_normlized_big, INTERPOLATION_TYPE
+        cv2.imshow(MAIN_WINDOW, np.array(img))
+
+        pixel_list_smol = interpolate_pixel_map(
+            img, pix_map_normlized_smol, INTERPOLATION_TYPE
+        )
+        pixel_list_big = interpolate_pixel_map(
+            img, pix_map_normlized_big, INTERPOLATION_TYPE
+        )
+        pixel_str_smol = pix_array2text(*pixel_list_smol)
+        pixel_str_big = pix_array2text(*pixel_list_big)
+        for server_id, panel_number, size in PANELS:
+            if size == 'big':
+                pixel_str = pixel_str_big
+            elif size == 'smol':
+                pixel_str = pixel_str_smol
+
+            manager.sessions[server_id].chunk_payload(
+                "M2600", "Q%d" % panel_number, pixel_str
             )
-            pixel_str_big = pix_array2text(*pixel_list_big)
-            for panel in range(PANELS):
-                # import pudb; pudb.set_trace()
-                if PANEL_LENGTHS[panel] == max(PANEL_LENGTHS):
-                    sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_big)
-            sesh.send_cmd_sync("M2610")
+            manager.sessions[server_id].send_cmd_sync('M2610')
 
             if ENABLE_PREVIEW:
                 draw_map(img, pix_map_normlized_smol)
