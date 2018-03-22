@@ -150,3 +150,32 @@ def normalize_pix_map(pix_map):
     # TODO: probably need to centre this better
 
     return normalized
+
+def mat_rotation_2d(angle):
+    """
+    Generate a rotation matrix from the angle in degrees.
+    """
+    theta = np.radians(angle)
+    val_cos, val_sin = np.cos(theta), np.sin(theta)
+    return np.matrix([[val_cos, -val_sin], [val_sin, val_cos]])
+
+def scale_mapping(mapping, scalar):
+    return [
+        scalar * coordinate \
+        for coordinate in mapping
+    ]
+
+def transpose_mapping(mapping, offset):
+    return [
+        coordinate + offset \
+        for coordinate in mapping
+    ]
+
+def rotate_mapping(mapping, angle):
+    mat = mat_rotation_2d(angle)
+    # TODO: fix this math
+    return [
+        np.asarray(mat * np.asmatrix(coordinate).transpose()).transpose()[0] \
+        for coordinate in mapping
+    ]
+    # import pudb; pudb.set_trace()
