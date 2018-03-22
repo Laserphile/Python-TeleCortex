@@ -109,7 +109,7 @@ class TelecortexSession(object):
 
     # TODO: group idle debug prints
 
-    chunk_size = 256
+    chunk_size = 255
     ser_buff_size = 2 * (chunk_size + 4)
     max_ack_queue = 5
 
@@ -551,10 +551,11 @@ class TelecortexSessionManager(object):
 
 
 SERVERS = OrderedDict([
-    # (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
-    # (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
+    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
+    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
     (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3}),
-    (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4})
+    (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4}),
+    (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058620', 'baud':57600, 'cid':5})
 ])
 
 def main():

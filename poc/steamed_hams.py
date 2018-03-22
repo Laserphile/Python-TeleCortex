@@ -6,6 +6,7 @@ import os
 from collections import OrderedDict
 from datetime import datetime
 from time import time as time_now
+from pprint import pformat
 
 import coloredlogs
 import cv2
@@ -19,8 +20,8 @@ from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
-# STREAM_LOG_LEVEL = logging.WARN
-STREAM_LOG_LEVEL = logging.ERROR
+STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.ERROR
 
 IMG_SIZE = 64
 MAX_HUE = 1.0
@@ -28,7 +29,7 @@ MAX_ANGLE = 360
 
 LOG_FILE = ".interpolate.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
+ENABLE_PREVIEW = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -48,8 +49,8 @@ TELECORTEX_DEV = "/dev/tty.usbmodem35"
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 10
 MAIN_WINDOW = 'image_window'
-INTERPOLATION_TYPE = 'bilinear'
-# INTERPOLATION_TYPE = 'nearest'
+# INTERPOLATION_TYPE = 'bilinear'
+INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 3
 
 def draw_map(image, pix_map_normlized, outline=None):
@@ -64,17 +65,38 @@ def draw_map(image, pix_map_normlized, outline=None):
         cv2.circle(image, pix_coordinate, DOT_RADIUS, outline, 1)
     return image
 
-MON = {'top': 100, 'left': 0, 'width': 200, 'height': 200}
+MON = {'top': 200, 'left': 200, 'width': 200, 'height': 200}
 
 PANELS = OrderedDict([
-    (2, [
+    (0, [
+        # (0, 'big'),
         (1, 'smol'),
-        (2, 'smol')
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (1, [
+        # (0, 'big'),
+        (1, 'smol'),
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (2, [
+        # (0, 'big'),
+        (1, 'smol'),
+        # (2, 'smol'),
+        # (3, 'smol')
     ]),
     (3, [
+        # (0, 'big'),
         (1, 'smol'),
-        (2, 'smol'),
-        (3, 'smol')
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (4, [
+        # (0, 'big'),
+        (1, 'smol'),
+        # (2, 'smol'),
+        # (3, 'smol')
     ])
 ])
 
@@ -120,6 +142,8 @@ def main():
         window_flags |= cv2.WINDOW_KEEPRATIO
 
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
+        cv2.moveWindow(MAIN_WINDOW, 500, 0)
+        key = cv2.waitKey(2) & 0xFF
 
     start_time = time_now()
 
@@ -153,11 +177,18 @@ def main():
             draw_map(img, pix_map_normlized_smol)
             draw_map(img, pix_map_normlized_big, outline=(255, 255, 255))
             cv2.imshow(MAIN_WINDOW, img)
-        if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-            key = cv2.waitKey(2) & 0xFF
-            if key == 27:
-                cv2.destroyAllWindows()
-                break
+            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
+                key = cv2.waitKey(2) & 0xFF
+                if key == 27:
+                    cv2.destroyAllWindows()
+                    break
+                elif key == ord('d'):
+                    import pudb; pudb.set_trace()
+                elif key == ord('p'):
+                    print("pix_map_normlized_smol:\n%s" % pformat(pix_map_normlized_smol))
+                    print("pix_map_normlized_big:\n%s" % pformat(pix_map_normlized_big))
+                # else:
+                #     print("key: %0x" % key)
 
 
 

@@ -30,7 +30,7 @@ STREAM_LOG_LEVEL = logging.WARN
 
 LOG_FILE = ".sesssion.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
+ENABLE_PREVIEW = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -57,15 +57,35 @@ INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
 PANELS = OrderedDict([
-    (2, [
+    (0, [
+        # (0, 'big'),
         (1, 'smol'),
-        (2, 'smol'),
-        (3, 'smol')
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (1, [
+        # (0, 'big'),
+        (1, 'smol'),
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (2, [
+        # (0, 'big'),
+        (1, 'smol'),
+        # (2, 'smol'),
+        # (3, 'smol')
     ]),
     (3, [
+        # (0, 'big'),
         (1, 'smol'),
-        (2, 'smol'),
-        (3, 'smol')
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (4, [
+        # (0, 'big'),
+        (1, 'smol'),
+        # (2, 'smol'),
+        # (3, 'smol')
     ])
 ])
 
@@ -139,11 +159,11 @@ def main():
             draw_map(test_img, pix_map_normlized_smol)
             draw_map(test_img, pix_map_normlized_big, outline=(255, 255, 255))
             cv2.imshow(MAIN_WINDOW, test_img)
-        if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-            key = cv2.waitKey(2) & 0xFF
-            if key == 27:
-                cv2.destroyAllWindows()
-                break
+            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
+                key = cv2.waitKey(2) & 0xFF
+                if key == 27:
+                    cv2.destroyAllWindows()
+                    break
 
 
 if __name__ == '__main__':

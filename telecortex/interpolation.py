@@ -1,6 +1,7 @@
 """Image Interpolation Functions."""
 
 import itertools
+import logging
 from math import ceil, floor
 
 import numpy as np
@@ -17,6 +18,12 @@ def blend_pixel(pixel_a, pixel_b, coefficient):
 
 def interpolate_pixel(image, coordinates, interp_type=None):
     """Get the colour of a pixel from its coordinates within an image."""
+    # logging.debug(
+    #     "interpolating pixel %s using %s on image:\n%s" % (
+    #         coordinates, interp_type, image
+    #     )
+    # )
+    # import pudb; pudb.set_trace()
     if interp_type is None:
         interp_type = 'nearest'
 
@@ -31,21 +38,17 @@ def interpolate_pixel(image, coordinates, interp_type=None):
         ]
 
     coordinate_floor = (
-        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1)),
-        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1))
+        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1)),
+        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1))
     )
     # Otherwise bilinear
-    coordinate_floor = (
-        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1)),
-        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1))
-    )
     coordinate_ceiling = (
-        int(np.clip(ceil(coordinates[1]), 0, image.shape[1] - 1)),
-        int(np.clip(ceil(coordinates[0]), 0, image.shape[0] - 1))
+        int(np.clip(ceil(coordinates[0]), 0, image.shape[0] - 1)),
+        int(np.clip(ceil(coordinates[1]), 0, image.shape[1] - 1))
     )
     coordinate_fractional = (
-        coordinates[1] - coordinate_floor[1],
-        coordinates[0] - coordinate_floor[0]
+        coordinates[0] - coordinate_floor[0],
+        coordinates[1] - coordinate_floor[1]
     )
     pixel_tl = image[
         coordinate_floor[1],
@@ -83,7 +86,7 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
         )
         pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
         if len(pixel_value) > 3:
-            # BRGA fix
+            # BGRA fix
             pixel_value = tuple(pixel_value[:3])
         pixel_list.append(pixel_value)
     # logging.debug("pixel_list: %s" % pformat(pixel_list))
