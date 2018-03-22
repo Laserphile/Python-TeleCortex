@@ -159,6 +159,14 @@ def mat_rotation_2d(angle):
     val_cos, val_sin = np.cos(theta), np.sin(theta)
     return np.matrix([[val_cos, -val_sin], [val_sin, val_cos]])
 
+def vector_transform(vector, matrix):
+    # TODO: fix this math
+    return np.asarray(matrix * np.asmatrix(vector).transpose()).transpose()[0] \
+
+def rotate_vector(vector, angle):
+    mat = mat_rotation_2d(angle)
+    return vector_transform(vector, mat)
+
 def scale_mapping(mapping, scalar):
     return [
         scalar * coordinate \
@@ -173,9 +181,7 @@ def transpose_mapping(mapping, offset):
 
 def rotate_mapping(mapping, angle):
     mat = mat_rotation_2d(angle)
-    # TODO: fix this math
     return [
-        np.asarray(mat * np.asmatrix(coordinate).transpose()).transpose()[0] \
+        vector_transform(coordinate, mat)
         for coordinate in mapping
     ]
-    # import pudb; pudb.set_trace()

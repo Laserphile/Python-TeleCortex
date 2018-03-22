@@ -18,7 +18,7 @@ import numpy as np
 from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
-                                normalize_pix_map, rotate_mapping, scale_mapping,
+                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
                                 transpose_mapping)
 from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
@@ -46,7 +46,7 @@ if ENABLE_LOG_FILE:
     LOGGER.addHandler(FILE_HANDLER)
 LOGGER.addHandler(STREAM_HANDLER)
 
-IMG_SIZE = 64
+IMG_SIZE = 128
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
@@ -59,31 +59,31 @@ DOT_RADIUS = 0
 PANELS = OrderedDict([
     (0, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (1 * 360 / 5)),
+        (1, 'smol', 0.5, (1 * 360 / 5), rotate_vector((0, 0.25), (1 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (1, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (2 * 360 / 5)),
+        (1, 'smol', 0.5, (2 * 360 / 5), rotate_vector((0, 0.25), (2 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (2, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (3 * 360 / 5)),
+        (1, 'smol', 0.5, (3 * 360 / 5), rotate_vector((0, 0.25), (3 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (3, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (4 * 360 / 5)),
+        (1, 'smol', 0.5, (4 * 360 / 5), rotate_vector((0, 0.25), (4 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (4, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (0 * 360 / 5)),
+        (1, 'smol', 0.5, (0 * 360 / 5), rotate_vector((0, 0.25), (0 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ])
@@ -147,7 +147,7 @@ def main():
         fill_rainbows(test_img, frameno)
 
         for server_id, server_panel_info in PANELS.items():
-            for panel_number, size, scale, angle in server_panel_info:
+            for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
                     if size == 'big':
                         map = pix_map_normlized_big
@@ -157,6 +157,7 @@ def main():
                     map = scale_mapping(map, scale)
                     map = rotate_mapping(map, angle)
                     map = transpose_mapping(map, (+0.5, +0.5))
+                    map = transpose_mapping(map, offset)
                     pixel_map_cache[(server_id, panel_number)] = map
                 else:
                     map = pixel_map_cache[(server_id, panel_number)]
@@ -174,8 +175,9 @@ def main():
 
         if ENABLE_PREVIEW:
             for map in pixel_map_cache.values():
-                draw_map(test_img, map, DOT_RADIUS)
                 draw_map(test_img, map, DOT_RADIUS+1, outline=(255, 255, 255))
+            for map in pixel_map_cache.values():
+                draw_map(test_img, map, DOT_RADIUS)
             cv2.imshow(MAIN_WINDOW, test_img)
             if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
                 key = cv2.waitKey(2) & 0xFF
