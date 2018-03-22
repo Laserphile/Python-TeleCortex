@@ -1,29 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import colorsys
 import logging
 import os
-import tkinter as tk
+from collections import OrderedDict
 from datetime import datetime
-from pprint import pformat, pprint
 from time import time as time_now
-
-import serial
-from serial.tools import list_ports
 
 import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
 from mss import mss
-from PIL import Image, ImageColor, ImageGrab, ImageTk
-from PIL.ImageDraw import ImageDraw
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map
-from telecortex.session import (PANEL_LENGTHS, TELECORTEX_BAUD, SERVERS,
-                                TelecortexSession,
-                                TelecortexSessionManager)
+from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
