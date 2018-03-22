@@ -108,7 +108,6 @@ def main():
 
     start_time = time_now()
 
-    manager = TelecortexSessionManager(SERVERS)
     while manager:
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
         fill_rainbows(test_img, frameno)
