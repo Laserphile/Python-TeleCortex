@@ -32,7 +32,7 @@ MAX_ANGLE = 360
 
 LOG_FILE = ".interpolate.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = False
+ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -56,7 +56,7 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 3
 
-MON = {'top': 200, 'left': 200, 'width': 100, 'height': 100}
+MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
 
 def main():
     """
