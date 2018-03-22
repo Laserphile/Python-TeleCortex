@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
                                 normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
                                 transpose_mapping)
 from telecortex.session import SERVERS, TelecortexSessionManager
@@ -55,39 +55,6 @@ MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
-
-PANELS = OrderedDict([
-    (0, [
-        # (0, 'big'),
-        (1, 'smol', 0.5, (1 * 360 / 5), rotate_vector((0, 0.25), (1 * 360 / 5))),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (1, [
-        # (0, 'big'),
-        (1, 'smol', 0.5, (2 * 360 / 5), rotate_vector((0, 0.25), (2 * 360 / 5))),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (2, [
-        # (0, 'big'),
-        (1, 'smol', 0.5, (3 * 360 / 5), rotate_vector((0, 0.25), (3 * 360 / 5))),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (3, [
-        # (0, 'big'),
-        (1, 'smol', 0.5, (4 * 360 / 5), rotate_vector((0, 0.25), (4 * 360 / 5))),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (4, [
-        # (0, 'big'),
-        (1, 'smol', 0.5, (0 * 360 / 5), rotate_vector((0, 0.25), (0 * 360 / 5))),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ])
-])
 
 def fill_rainbows(image, angle=0.0):
     for col in range(IMG_SIZE):

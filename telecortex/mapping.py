@@ -1,6 +1,7 @@
 """Module for mapping panel pixels to animation pixels."""
 
 import numpy as np
+from collections import OrderedDict
 
 # Pixel mapping from pixel_map_helper.py in touch_dome
 
@@ -185,3 +186,36 @@ def rotate_mapping(mapping, angle):
         vector_transform(coordinate, mat)
         for coordinate in mapping
     ]
+
+PANELS = OrderedDict([
+    (0, [
+        # (0, 'big'),
+        (1, 'smol', 0.5, (1 * 360 / 5), rotate_vector((0, 0.25), (1 * 360 / 5))),
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (1, [
+        # (0, 'big'),
+        (1, 'smol', 0.5, (2 * 360 / 5), rotate_vector((0, 0.25), (2 * 360 / 5))),
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (2, [
+        # (0, 'big'),
+        (1, 'smol', 0.5, (3 * 360 / 5), rotate_vector((0, 0.25), (3 * 360 / 5))),
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (3, [
+        # (0, 'big'),
+        (1, 'smol', 0.5, (4 * 360 / 5), rotate_vector((0, 0.25), (4 * 360 / 5))),
+        # (2, 'smol'),
+        # (3, 'smol')
+    ]),
+    (4, [
+        # (0, 'big'),
+        (1, 'smol', 0.5, (0 * 360 / 5), rotate_vector((0, 0.25), (0 * 360 / 5))),
+        # (2, 'smol'),
+        # (3, 'smol')
+    ])
+])
