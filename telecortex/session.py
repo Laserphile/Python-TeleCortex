@@ -308,6 +308,10 @@ class TelecortexSession(object):
         elif errnum in [11]:
             pass
             # can't resend after receive acknowledgement
+        elif errnum in [14]:
+            # base64 panel payload should be a multiple of 4 bytes
+            # happens a lot, just skip
+            pass
         else:
             raise UserWarning(warning)
 
