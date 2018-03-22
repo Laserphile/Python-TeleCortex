@@ -159,6 +159,7 @@ class TelecortexSession(object):
         # commands which expect acknowledgement
         self.ack_queue = OrderedDict()
         self.responses = OrderedDict()
+        self.cid = 0
 
     def fmt_cmd(self, linenum=None, cmd=None, args=None):
         cmd = " ".join(filter(None, [cmd, args]))
@@ -229,7 +230,8 @@ class TelecortexSession(object):
         assert \
             response.startswith('S'), \
             "unknown response format for N%d: %s" % (linenum, response)
-        return response[1:]
+        self.cid = response[1:]
+        return self.cid
 
     def chunk_payload(self, cmd, static_args, payload, sync=True):
         offset = 0;
@@ -298,6 +300,7 @@ class TelecortexSession(object):
                 warning,
                 self.ack_queue.get(linenum, "???")
             )
+        warning = "CID: %s %s" % (self.cid, warning)
         logging.error(warning)
         if errnum in [10, 19]:
             pass
@@ -330,12 +333,15 @@ class TelecortexSession(object):
 
     def handle_resend(self, linenum):
         if linenum not in self.ack_queue:
-            error = "could not resend unknown linenum: %d" % linenum
+            error = "CID: %s could not resend unknown linenum: %d" % (self.cid, linenum)
             logging.error(error)
             # raise UserWarning(error)
-        warning = "resending %s" % ", ".join([
-            "N%s" % line for line in self.ack_queue.keys() if line >= linenum
-        ])
+        warning = "CID: %s resending %s" % (
+            self.cid,
+            ", ".join([
+                "N%s" % line for line in self.ack_queue.keys() if line >= linenum
+            ])
+        )
         logging.warning(warning)
         old_queue = deepcopy(self.ack_queue)
         self.clear_ack_queue()
@@ -398,9 +404,9 @@ class TelecortexSession(object):
                     fps = int(match.get('fps'))
                     queue_occ = int(match.get('queue_occ'))
                     queue_max = int(match.get('queue_max'))
-                    logging.error(
-                        "FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
-                            fps, cmd_rate, pix_rate,
+                    logging.warning(
+                        "CID: %2s FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
+                            self.cid, fps, cmd_rate, pix_rate,
                             "%s / %s" % (queue_occ, queue_max)
                         )
                     )
@@ -555,7 +561,7 @@ SERVERS = OrderedDict([
     (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
     (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3}),
     (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4}),
-    (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058620', 'baud':57600, 'cid':5})
+    (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058621', 'baud':57600, 'cid':5})
 ])
 
 def main():
