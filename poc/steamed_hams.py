@@ -81,6 +81,7 @@ def main():
 
     sct = mss()
 
+    img = np.array(sct.grab(MON))
 
     if ENABLE_PREVIEW:
         window_flags = 0
@@ -91,7 +92,10 @@ def main():
 
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
         cv2.moveWindow(MAIN_WINDOW, 500, 0)
+        cv2.imshow(MAIN_WINDOW, img)
         key = cv2.waitKey(2) & 0xFF
+
+    pixel_map_cache = OrderedDict()
 
     start_time = time_now()
 
@@ -101,20 +105,26 @@ def main():
 
         cv2.imshow(MAIN_WINDOW, np.array(img))
 
-        pixel_list_smol = interpolate_pixel_map(
-            img, pix_map_normlized_smol, INTERPOLATION_TYPE
-        )
-        pixel_list_big = interpolate_pixel_map(
-            img, pix_map_normlized_big, INTERPOLATION_TYPE
-        )
-        pixel_str_smol = pix_array2text(*pixel_list_smol)
-        pixel_str_big = pix_array2text(*pixel_list_big)
         for server_id, server_panel_info in PANELS.items():
-            for panel_number, size in server_panel_info:
-                if size == 'big':
-                    pixel_str = pixel_str_big
-                elif size == 'smol':
-                    pixel_str = pixel_str_smol
+            for panel_number, size, scale, angle, offset in server_panel_info:
+                if (server_id, panel_number) not in pixel_map_cache.keys():
+                    if size == 'big':
+                        map = pix_map_normlized_big
+                    elif size == 'smol':
+                        map = pix_map_normlized_smol
+                    map = transpose_mapping(map, (-0.5, -0.5))
+                    map = scale_mapping(map, scale)
+                    map = rotate_mapping(map, angle)
+                    map = transpose_mapping(map, (+0.5, +0.5))
+                    map = transpose_mapping(map, offset)
+                    pixel_map_cache[(server_id, panel_number)] = map
+                else:
+                    map = pixel_map_cache[(server_id, panel_number)]
+
+                pixel_list = interpolate_pixel_map(
+                    img, map, INTERPOLATION_TYPE
+                )
+                pixel_str = pix_array2text(*pixel_list)
 
                 manager.sessions[server_id].chunk_payload(
                     "M2600", "Q%d" % panel_number, pixel_str
@@ -122,8 +132,10 @@ def main():
             manager.sessions[server_id].send_cmd_sync('M2610')
 
         if ENABLE_PREVIEW:
-            draw_map(img, pix_map_normlized_smol)
-            draw_map(img, pix_map_normlized_big, outline=(255, 255, 255))
+            for map in pixel_map_cache.values():
+                draw_map(img, map, DOT_RADIUS+1, outline=(255, 255, 255))
+            for map in pixel_map_cache.values():
+                draw_map(img, map, DOT_RADIUS)
             cv2.imshow(MAIN_WINDOW, img)
             if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
                 key = cv2.waitKey(2) & 0xFF
@@ -132,13 +144,6 @@ def main():
                     break
                 elif key == ord('d'):
                     import pudb; pudb.set_trace()
-                elif key == ord('p'):
-                    print("pix_map_normlized_smol:\n%s" % pformat(pix_map_normlized_smol))
-                    print("pix_map_normlized_big:\n%s" % pformat(pix_map_normlized_big))
-                # else:
-                #     print("key: %0x" % key)
-
-
 
 if __name__ == '__main__':
     main()
