@@ -2,6 +2,7 @@
 
 import numpy as np
 from collections import OrderedDict
+import cv2
 
 # Pixel mapping from pixel_map_helper.py in touch_dome
 
@@ -219,3 +220,15 @@ PANELS = OrderedDict([
         # (3, 'smol')
     ])
 ])
+
+def draw_map(image, pix_map_normlized, radius=1, outline=None):
+    """Given an image and a normalized pixel map, draw the map on the image."""
+    if outline is None:
+        outline = (0, 0, 0)
+    for pixel in pix_map_normlized:
+        pix_coordinate = (
+            int(image.shape[0] * pixel[0]),
+            int(image.shape[1] * pixel[1])
+        )
+        cv2.circle(image, pix_coordinate, radius, outline, 1)
+    return image

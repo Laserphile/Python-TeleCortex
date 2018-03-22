@@ -19,7 +19,7 @@ from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
                                 normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping)
+                                transpose_mapping, draw_map)
 from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
 
@@ -64,18 +64,6 @@ def fill_rainbows(image, angle=0.0):
         cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
     return image
 
-def draw_map(image, pix_map_normlized, radius=1, outline=None):
-    """Given an image and a normalized pixel map, draw the map on the image."""
-    if outline is None:
-        outline = (0, 0, 0)
-    for pixel in pix_map_normlized:
-        pix_coordinate = (
-            int(image.shape[0] * pixel[0]),
-            int(image.shape[1] * pixel[1])
-        )
-        cv2.circle(image, pix_coordinate, radius, outline, 1)
-    return image
-
 def main():
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
@@ -84,7 +72,7 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    test_img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
     if ENABLE_PREVIEW:
         window_flags = 0
@@ -94,16 +82,9 @@ def main():
         window_flags |= cv2.WINDOW_KEEPRATIO
 
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.imshow(MAIN_WINDOW, test_img)
-
-    # pixel_list_smol = interpolate_pixel_map(
-    #     test_img, pix_map_normlized_smol, INTERPOLATION_TYPE
-    # )
-    # pixel_list_big = interpolate_pixel_map(
-    #     test_img, pix_map_normlized_big, INTERPOLATION_TYPE
-    # )
-    # pixel_str_smol = pix_array2text(*pixel_list_smol)
-    # pixel_str_big = pix_array2text(*pixel_list_big)
+        cv2.imshow(MAIN_WINDOW, img)
+        cv2.moveWindow(MAIN_WINDOW, 500, 0)
+        key = cv2.waitKey(2) & 0xFF
 
     pixel_map_cache = OrderedDict()
 
@@ -111,7 +92,7 @@ def main():
 
     while manager:
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
-        fill_rainbows(test_img, frameno)
+        fill_rainbows(img, frameno)
 
         for server_id, server_panel_info in PANELS.items():
             for panel_number, size, scale, angle, offset in server_panel_info:
@@ -130,7 +111,7 @@ def main():
                     map = pixel_map_cache[(server_id, panel_number)]
 
                 pixel_list = interpolate_pixel_map(
-                    test_img, map, INTERPOLATION_TYPE
+                    img, map, INTERPOLATION_TYPE
                 )
                 pixel_str = pix_array2text(*pixel_list)
 
@@ -142,10 +123,10 @@ def main():
 
         if ENABLE_PREVIEW:
             for map in pixel_map_cache.values():
-                draw_map(test_img, map, DOT_RADIUS+1, outline=(255, 255, 255))
+                draw_map(img, map, DOT_RADIUS+1, outline=(255, 255, 255))
             for map in pixel_map_cache.values():
-                draw_map(test_img, map, DOT_RADIUS)
-            cv2.imshow(MAIN_WINDOW, test_img)
+                draw_map(img, map, DOT_RADIUS)
+            cv2.imshow(MAIN_WINDOW, img)
             if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
                 key = cv2.waitKey(2) & 0xFF
                 if key == 27:

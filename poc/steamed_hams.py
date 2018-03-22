@@ -11,12 +11,15 @@ from pprint import pformat
 import coloredlogs
 import cv2
 import numpy as np
-from context import telecortex
 from mss import mss
+from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
+                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
+                                transpose_mapping, draw_map)
 from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
+
 
 # STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
@@ -53,62 +56,7 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 3
 
-def draw_map(image, pix_map_normlized, outline=None):
-    """Given an image and a normalized pixel map, draw the map on the image."""
-    if outline is None:
-        outline = (0, 0, 0)
-    for pixel in pix_map_normlized:
-        pix_coordinate = (
-            int(image.shape[0] * pixel[0]),
-            int(image.shape[1] * pixel[1])
-        )
-        cv2.circle(image, pix_coordinate, DOT_RADIUS, outline, 1)
-    return image
-
-MON = {'top': 200, 'left': 200, 'width': 200, 'height': 200}
-
-PANELS = OrderedDict([
-    (0, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (1, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (2, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (3, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (4, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ])
-])
-
-# PANELS = [
-#     # (0, 0, 'big'),
-#     (2, 1, 'smol'),
-#     (2, 2, 'smol'),
-#     # (2, 3, 'smol'),
-#     (3, 1, 'smol'),
-#     (3, 2, 'smol'),
-#     (3, 3, 'smol')
-# ]
+MON = {'top': 200, 'left': 200, 'width': 100, 'height': 100}
 
 def main():
     """

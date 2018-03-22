@@ -17,10 +17,10 @@ import cv2
 import numpy as np
 from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map
-from telecortex.session import (PANEL_LENGTHS, TELECORTEX_BAUD, SERVERS,
-                                TelecortexSession,
-                                TelecortexSessionManager)
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
+                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
+                                transpose_mapping, draw_map)
+from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -97,18 +97,6 @@ def fill_rainbows(image, angle=0.0):
         cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
     return image
 
-def draw_map(image, pix_map_normlized, outline=None):
-    """Given an image and a normalized pixel map, draw the map on the image."""
-    if outline is None:
-        outline = (0, 0, 0)
-    for pixel in pix_map_normlized:
-        pix_coordinate = (
-            int(image.shape[0] * pixel[0]),
-            int(image.shape[1] * pixel[1])
-        )
-        cv2.circle(image, pix_coordinate, DOT_RADIUS, outline, 1)
-    return image
-
 def main():
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
@@ -117,7 +105,7 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    test_img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
     if ENABLE_PREVIEW:
         window_flags = 0
@@ -127,19 +115,19 @@ def main():
         window_flags |= cv2.WINDOW_KEEPRATIO
 
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.imshow(MAIN_WINDOW, test_img)
+        cv2.imshow(MAIN_WINDOW, img)
 
     start_time = time_now()
 
     while manager:
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
-        fill_rainbows(test_img, frameno)
+        fill_rainbows(img, frameno)
 
         pixel_list_smol = interpolate_pixel_map(
-            test_img, pix_map_normlized_smol, INTERPOLATION_TYPE
+            img, pix_map_normlized_smol, INTERPOLATION_TYPE
         )
         pixel_list_big = interpolate_pixel_map(
-            test_img, pix_map_normlized_big, INTERPOLATION_TYPE
+            img, pix_map_normlized_big, INTERPOLATION_TYPE
         )
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
@@ -156,9 +144,9 @@ def main():
             manager.sessions[server_id].send_cmd_sync('M2610')
 
         if ENABLE_PREVIEW:
-            draw_map(test_img, pix_map_normlized_smol)
-            draw_map(test_img, pix_map_normlized_big, outline=(255, 255, 255))
-            cv2.imshow(MAIN_WINDOW, test_img)
+            draw_map(img, pix_map_normlized_smol)
+            draw_map(img, pix_map_normlized_big, outline=(255, 255, 255))
+            cv2.imshow(MAIN_WINDOW, img)
             if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
                 key = cv2.waitKey(2) & 0xFF
                 if key == 27:
