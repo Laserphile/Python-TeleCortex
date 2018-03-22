@@ -440,7 +440,8 @@ class TelecortexSession(object):
                     self.handle_resend_match(match)
             else:
                 logging.warn(
-                    "line not recognised:\n%s\n" % (
+                    "CID: %s line not recognised:\n%s\n" % (
+                        self.cid,
                         repr(line.encode('ascii', errors='backslashreplace'))
                     )
                 )
