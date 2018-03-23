@@ -161,6 +161,15 @@ class TelecortexSession(object):
         self.responses = OrderedDict()
         self.cid = 0
 
+    @classmethod
+    def from_serial_conf(cls, serial_conf, linenum=0):
+        ser = serial.Serial(
+            port=serial_conf.get('port'),
+            baudrate=serial_conf.get('baud', DEFAULT_BAUDRATE),
+            timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
+        )
+        return TelecortexSession(ser)
+
     def fmt_cmd(self, linenum=None, cmd=None, args=None):
         cmd = " ".join(filter(None, [cmd, args]))
         if linenum is not None:
