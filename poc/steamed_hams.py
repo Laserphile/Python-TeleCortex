@@ -12,6 +12,7 @@ import coloredlogs
 import cv2
 import numpy as np
 from mss import mss
+# noinspection PyUnresolvedReferences
 from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
@@ -19,7 +20,6 @@ from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
                                 transpose_mapping, draw_map)
 from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
-
 
 # STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
@@ -56,7 +56,9 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 3
 
+# viewport definition
 MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
+
 
 def main():
     """
@@ -109,20 +111,22 @@ def main():
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
                     if size == 'big':
-                        map = pix_map_normlized_big
+                        panel_map = pix_map_normlized_big
                     elif size == 'smol':
-                        map = pix_map_normlized_smol
-                    map = transpose_mapping(map, (-0.5, -0.5))
-                    map = scale_mapping(map, scale)
-                    map = rotate_mapping(map, angle)
-                    map = transpose_mapping(map, (+0.5, +0.5))
-                    map = transpose_mapping(map, offset)
-                    pixel_map_cache[(server_id, panel_number)] = map
+                        panel_map = pix_map_normlized_smol
+                    else:
+                        raise UserWarning('Panel not a know dimension')
+                    panel_map = transpose_mapping(panel_map, (-0.5, -0.5))
+                    panel_map = scale_mapping(panel_map, scale)
+                    panel_map = rotate_mapping(panel_map, angle)
+                    panel_map = transpose_mapping(panel_map, (+0.5, +0.5))
+                    panel_map = transpose_mapping(panel_map, offset)
+                    pixel_map_cache[(server_id, panel_number)] = panel_map
                 else:
-                    map = pixel_map_cache[(server_id, panel_number)]
+                    panel_map = pixel_map_cache[(server_id, panel_number)]
 
                 pixel_list = interpolate_pixel_map(
-                    img, map, INTERPOLATION_TYPE
+                    img, panel_map, INTERPOLATION_TYPE
                 )
                 pixel_str = pix_array2text(*pixel_list)
 
@@ -132,10 +136,10 @@ def main():
             manager.sessions[server_id].send_cmd_sync('M2610')
 
         if ENABLE_PREVIEW:
-            for map in pixel_map_cache.values():
-                draw_map(img, map, DOT_RADIUS+1, outline=(255, 255, 255))
-            for map in pixel_map_cache.values():
-                draw_map(img, map, DOT_RADIUS)
+            for panel_map in pixel_map_cache.values():
+                draw_map(img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
+            for panel_map in pixel_map_cache.values():
+                draw_map(img, panel_map, DOT_RADIUS)
             cv2.imshow(MAIN_WINDOW, img)
             if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
                 key = cv2.waitKey(2) & 0xFF
@@ -143,7 +147,9 @@ def main():
                     cv2.destroyAllWindows()
                     break
                 elif key == ord('d'):
-                    import pudb; pudb.set_trace()
+                    import pudb
+                    pudb.set_trace()
+
 
 if __name__ == '__main__':
     main()
