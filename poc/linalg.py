@@ -28,7 +28,7 @@ from telecortex.util import pix_array2text
 STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
-LOG_FILE = ".sesssion.log"
+LOG_FILE = ".linalg.log"
 ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
 

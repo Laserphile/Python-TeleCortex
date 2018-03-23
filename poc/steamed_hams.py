@@ -30,7 +30,7 @@ IMG_SIZE = 64
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 
-LOG_FILE = ".interpolate.log"
+LOG_FILE = ".hams.log"
 ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
 
