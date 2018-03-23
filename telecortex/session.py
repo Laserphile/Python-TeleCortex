@@ -37,6 +37,7 @@ PANEL_LENGTHS = [
 ]
 PANELS = len(PANEL_LENGTHS)
 
+
 def find_serial_dev(vid=None, pid=None, ser=None):
     """
     Given a Vendor ID and (optional) Product ID, enumerate the serial ports
@@ -94,7 +95,6 @@ def query_serial_dev(vid=None, pid=None, ser=None):
         target_device = port_info.device
         matching_devs.append(target_device)
     return matching_devs
-
 
 
 class TelecortexSession(object):
@@ -246,21 +246,21 @@ class TelecortexSession(object):
                 chunk_args
             )
             # 4 bytes per pixel because base64 encoded 24bit RGB
-            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len('\r\n'))/4)
+            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len('\r\n')) / 4)
             assert \
                 pixels_left > 0, \
                 "not enough bytes left to chunk cmd, skeleton: %s, chunk_size: %s" % (
                     skeleton_cmd,
                     self.chunk_size
                 )
-            chunk_args += "".join(payload[:(pixels_left*4)])
+            chunk_args += "".join(payload[:(pixels_left * 4)])
 
             self.send_cmd_sync(
                 cmd,
                 chunk_args
             )
 
-            payload = payload[(pixels_left*4):]
+            payload = payload[(pixels_left * 4):]
             offset += pixels_left
 
     def clear_ack_queue(self):
@@ -485,9 +485,11 @@ class TelecortexSession(object):
     def close(self):
         self.ser.close()
 
+
 """
 servers is a list of objects containing information about a server's configuration.
 """
+
 
 class TelecortexSessionManager(object):
     # TODO: This
@@ -547,7 +549,6 @@ class TelecortexSessionManager(object):
                 logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
 
-
     def close(self):
         for server_id, session in self.sessions.items():
             session.close()
@@ -568,6 +569,7 @@ SERVERS = OrderedDict([
     (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4}),
     (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058621', 'baud':57600, 'cid':5})
 ])
+
 
 def main():
     manager = TelecortexSessionManager(SERVERS)
