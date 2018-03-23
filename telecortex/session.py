@@ -66,14 +66,15 @@ def find_serial_dev(vid=None, pid=None, ser=None):
         target_device = port_info.device
         return target_device
 
-def query_serial_dev(vid=None, pid=None, ser=None):
+
+def query_serial_dev(vid=None, pid=None, ser=None, dev=None):
     """
     Given a Vendor ID and (optional) Product ID, return the serial ports which
     match these parameters
     """
     logging.debug(
-        "Querying for: VID: %s, PID: %s, SER: %s",
-        repr(vid), repr(pid), repr(ser)
+        "Querying for: VID: %s, PID: %s, SER: %s, DEV: %s",
+        repr(vid), repr(pid), repr(ser), repr(dev)
     )
     matching_devs = []
     for port_info in list_ports.comports():
@@ -90,6 +91,9 @@ def query_serial_dev(vid=None, pid=None, ser=None):
             continue
         if ser is not None and port_info.serial_number != str(ser):
             logging.debug("ser not match %s | %s", ser, port_info.serial_number)
+            continue
+        if dev is not None and port_info.device != dev:
+            logging.debug("dev not match %s | %s", ser, port_info.serial_number)
             continue
         logging.info("found target device: %s" % port_info.device)
         target_device = port_info.device
@@ -121,29 +125,29 @@ class TelecortexSession(object):
     re_set = r"^;SET: "
     re_loo = r"^;LOO: "
     re_loo_rates = (
-        r"%s"
-        r"FPS:\s+(?P<fps>[\d\.]+),?\s*"
-        r"CMD_RATE:\s+(?P<cmd_rate>[\d\.]+)\s*cps,?\s*"
-        r"PIX_RATE:\s+(?P<pix_rate>[\d\.]+)\s*pps,?\s*"
-        r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
-    ) % re_loo
+                       r"%s"
+                       r"FPS:\s+(?P<fps>[\d\.]+),?\s*"
+                       r"CMD_RATE:\s+(?P<cmd_rate>[\d\.]+)\s*cps,?\s*"
+                       r"PIX_RATE:\s+(?P<pix_rate>[\d\.]+)\s*pps,?\s*"
+                       r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
+                   ) % re_loo
     re_loo_timing = (
-        r"%s"
-        r"TIME:\s+(?P<time>\d+),?\s*"
-    ) % re_loo
+                        r"%s"
+                        r"TIME:\s+(?P<time>\d+),?\s*"
+                    ) % re_loo
     re_loo_get_stats = (
-        r"%s"
-        r"GET_CMD:\s+(?P<get_cmd>\d+),?\s*"
-        r"ENQD:\s+(?P<enqd>\d+),?\s*"
-    ) % re_loo
+                           r"%s"
+                           r"GET_CMD:\s+(?P<get_cmd>\d+),?\s*"
+                           r"ENQD:\s+(?P<enqd>\d+),?\s*"
+                       ) % re_loo
     re_loo_proc_stats = (
-        r"%s"
-        r"CMD:\s+(?P<cmd>[A-Z] \d+),?\s*"
-        r"PIXLS:\s+(?P<pixls>\d+),?\s*"
-        r"PROC_CMD:\s+(?P<proc_cmd>\d+),?\s*"
-        r"PARSE_CMD:\s+(?P<parse_cmd>\d+),?\s*"
-        r"PR_PA_CMD:\s+(?P<pr_pa_cmd>\d+),?\s*"
-    ) % re_loo
+                            r"%s"
+                            r"CMD:\s+(?P<cmd>[A-Z] \d+),?\s*"
+                            r"PIXLS:\s+(?P<pixls>\d+),?\s*"
+                            r"PROC_CMD:\s+(?P<proc_cmd>\d+),?\s*"
+                            r"PARSE_CMD:\s+(?P<parse_cmd>\d+),?\s*"
+                            r"PR_PA_CMD:\s+(?P<pr_pa_cmd>\d+),?\s*"
+                        ) % re_loo
     re_loo_get_cmd_time = r"%sget_cmd: (?P<time>[\d\.]+)" % re_loo
     re_loo_process_cmd_time = r"%sprocess_cmd: (?P<time>[\d\.]+)" % re_loo
     re_enq = r"^;ENQ: "
@@ -281,13 +285,13 @@ class TelecortexSession(object):
                 del self.ack_queue[ack_linenum]
         else:
             logging.warn((
-                "received an acknowledgement "
-                "for an unknown command: %s"
-                "known linenums: %s"
-            ) % (
-                self.last_line,
-                self.ack_queue.keys()
-            ))
+                             "received an acknowledgement "
+                             "for an unknown command: %s"
+                             "known linenums: %s"
+                         ) % (
+                             self.last_line,
+                             self.ack_queue.keys()
+                         ))
 
     def handle_error(self, errnum, err, linenum=None):
         warning = "error %s: %s" % (
@@ -521,12 +525,18 @@ class TelecortexSessionManager(object):
 
             # if session does not exist, create a new one
             dev_kwargs = {}
-            for key in ['vid', 'pid', 'ser']:
+            for key in ['vid', 'pid', 'ser', 'dev']:
                 if key in server_info:
                     dev_kwargs[key] = server_info[key]
 
             if IGNORE_SERIAL_NO:
-                del dev_kwargs['ser']
+                if 'ser' in dev_kwargs:
+                    del dev_kwargs['ser']
+                if 'vid' in dev_kwargs:
+                    del dev_kwargs['vid']
+                if 'pid' in dev_kwargs:
+                    del dev_kwargs['pid']
+
 
             ports = query_serial_dev(**dev_kwargs)
             if not ports:
@@ -563,11 +573,11 @@ class TelecortexSessionManager(object):
 
 
 SERVERS = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
-    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
-    (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3}),
-    (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4}),
-    (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058621', 'baud':57600, 'cid':5})
+    (0, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4057531', 'baud': 57600, 'cid': 1}),
+    (1, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4058601', 'baud': 57600, 'cid': 2}),
+    (2, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem3176951', 'baud': 57600, 'cid': 3}),
+    (3, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4057541', 'baud': 57600, 'cid': 4}),
+    (4, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4058621', 'baud': 57600, 'cid': 5})
 ])
 
 
