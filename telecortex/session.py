@@ -200,12 +200,13 @@ class TelecortexSession(object):
 
     @classmethod
     def from_serial_conf(cls, serial_conf, linenum=0):
+        # TODO: I don't think this works because of garbage collection?
         ser = serial.Serial(
             port=serial_conf.get('port'),
             baudrate=serial_conf.get('baud', DEFAULT_BAUDRATE),
             timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
         )
-        return TelecortexSession.from_serial_obj(ser)
+        return cls(ser, linenum)
 
     def fmt_cmd(self, linenum=None, cmd=None, args=None):
         raise DeprecationWarning("create cmd object and format instead")
@@ -556,7 +557,6 @@ servers is a list of objects containing information about a server's configurati
 
 
 class TelecortexSessionManager(object):
-    # TODO: This
     def __init__(self, servers):
         self.servers = servers
         self.sessions = OrderedDict()
