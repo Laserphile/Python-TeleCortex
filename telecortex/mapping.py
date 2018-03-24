@@ -163,7 +163,7 @@ def mat_rotation_2d(angle):
 
 def vector_transform(vector, matrix):
     # TODO: fix this math
-    return np.asarray(matrix * np.asmatrix(vector).transpose()).transpose()[0] \
+    return np.asarray(matrix * np.asmatrix(vector).transpose()).transpose()[0]
 
 def rotate_vector(vector, angle):
     mat = mat_rotation_2d(angle)
