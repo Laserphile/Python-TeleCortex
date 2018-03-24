@@ -90,11 +90,13 @@ def main():
 
     start_time = time_now()
 
-    while manager:
+    while any([manager.sessions.get(server_id) for server_id in PANELS]):
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
         for server_id, server_panel_info in PANELS.items():
+            if not manager.sessions.get(server_id):
+                continue
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
                     if size == 'big':

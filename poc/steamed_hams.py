@@ -99,13 +99,15 @@ def main():
 
     start_time = time_now()
 
-    while manager:
+    while any([manager.sessions.get(server_id) for server_id in PANELS]):
 
         img = np.array(sct.grab(MON))
 
         cv2.imshow(MAIN_WINDOW, np.array(img))
 
         for server_id, server_panel_info in PANELS.items():
+            if not manager.sessions.get(server_id):
+                continue
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
                     if size == 'big':
