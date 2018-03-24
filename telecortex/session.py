@@ -109,6 +109,53 @@ class TelecortexCommand(object):
         self.args = args
         self.bytes_occupied = None
 
+    @classmethod
+    def fmt_cmd_args(cls, cmd, args):
+        if args:
+            return " ".join(
+                [cmd] + [
+                    "%s%s" % (key, value) for key, value in args.items()
+                ]
+            )
+        return cmd
+
+    def add_checksum(self, cmd):
+        checksum = 0
+        if cmd[-1] != ' ':
+            cmd += ' '
+        for c in cmd:
+            checksum ^= ord(c)
+        return cmd + "*%d" % checksum
+
+    def fmt(self, checksum=False):
+        cmd = self.fmt_cmd_args(self.cmd, self.args)
+        if checksum:
+            cmd = self.add_checksum(cmd)
+        return cmd
+
+class TelecortexLineCommand(TelecortexCommand):
+    """
+    Telecortex Command which has a linenumber
+    """
+    def __init__(self, owner, linenum, cmd, args=None):
+        super(TelecortexLineCommand, self).__init__(cmd, args)
+        self.owner = owner
+        self.linenum = linenum
+
+    @classmethod
+    def fmt_line_cmd_args(cls, line, cmd, args):
+        return "N%d %s" % (
+            line,
+            cls.fmt_cmd_args(cmd, args)
+        )
+
+    def fmt(self, checksum=False):
+        cmd = self.fmt_line_cmd_args(self.linenum, self.cmd, self.args)
+        if checksum:
+            cmd = self.add_checksum(cmd)
+        return cmd
+
+
 class TelecortexSession(object):
     """
     Manages a serial session with a Telecortex device.
@@ -122,7 +169,7 @@ class TelecortexSession(object):
     # TODO: group idle debug prints
 
     chunk_size = 256
-    ser_buff_size = 1 * chunk_size
+    ser_buff_size = 2 * chunk_size
     max_ack_queue = 5
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
