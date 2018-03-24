@@ -83,6 +83,15 @@ SERVERS = OrderedDict([
     }),
 ])
 
+# Uncomment for Derwent config
+# SERVERS = OrderedDict([
+#     (1, {
+#         'file': '/dev/cu.usbmodem144101',
+#         'baud': 57600,
+#         'timeout': 1
+#     }),
+# ])
+
 PANELS = OrderedDict([
     (0, [
         # (0, 'big'),
