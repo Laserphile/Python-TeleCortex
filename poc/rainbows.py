@@ -93,7 +93,7 @@ def main():
                     pixel_list = list(itertools.chain(*pixel_list))
                     pixel_str = pix_array2text(*pixel_list)
                     sesh.chunk_payload_with_linenum("M2601", {"Q":panel}, pixel_str)
-            sesh.send_cmd_sync("M2610")
+            sesh.send_cmd_with_linenum("M2610")
             frameno = (frameno + 1) % 255
 
 
