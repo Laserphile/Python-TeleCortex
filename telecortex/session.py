@@ -422,7 +422,10 @@ class TelecortexSession(object):
         self.linecount = linenum
         for resend_linenum, resend_command in old_queue.items():
             if resend_linenum >= self.linecount:
-                self.send_cmd_with_linenum(*resend_command)
+                self.send_cmd_with_linenum(
+                    resend_command.cmd,
+                    resend_command.args
+                )
 
     def set_linenum(self, linenum):
         self.send_cmd_with_linenum(
