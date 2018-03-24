@@ -266,7 +266,9 @@ class TelecortexSession(object):
         self.cid = response[1:]
         return self.cid
 
-    def chunk_payload_with_linenum(self, cmd, static_args, payload):
+    def chunk_payload_with_linenum(self, cmd, static_args, payload=None):
+        if payload is None:
+            self.send_cmd_with_linenum(cmd, static_args)
         offset = 0
         while payload:
             chunk_args = deepcopy(static_args)
