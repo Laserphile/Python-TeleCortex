@@ -22,9 +22,9 @@ from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
                                 transpose_mapping, draw_map)
 from telecortex.util import pix_array2text
 
-STREAM_LOG_LEVEL = logging.DEBUG
+# STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
-# STREAM_LOG_LEVEL = logging.WARN
+STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".parallel.log"
@@ -56,11 +56,31 @@ INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
 SERVERS = OrderedDict([
-    (1, {
-        'file': '/dev/cu.usbmodem144101',
+    (0, {
+        'file': '/dev/cu.usbmodem3176951',
         'baud': 57600,
         'timeout': 1
-    })
+    }),
+    (1, {
+        'file': '/dev/cu.usbmodem4057531',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (2, {
+        'file': '/dev/cu.usbmodem4057541',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (3, {
+        'file': '/dev/cu.usbmodem4058601',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (4, {
+        'file': '/dev/cu.usbmodem4058621',
+        'baud': 57600,
+        'timeout': 1
+    }),
 ])
 
 PANELS = OrderedDict([
