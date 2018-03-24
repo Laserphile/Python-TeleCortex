@@ -1,15 +1,20 @@
+import itertools
 import logging
 import multiprocessing as mp
 import os
 from collections import OrderedDict
 
+import serial
+
 import coloredlogs
 from context import telecortex
-from telecortex.session import TelecortexSession
+from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
+                                PANEL_LENGTHS, PANELS, TelecortexSession)
+from telecortex.util import pix_array2text
 
-# STREAM_LOG_LEVEL = logging.DEBUG
+STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".parallel.log"
@@ -43,11 +48,26 @@ DOT_RADIUS = 0
 
 def controller_thread(serial_conf, pipe):
     # setup serial device
-    sesh = TelecortexSession.from_serial_conf(serial_conf)
+    ser = serial.Serial(
+        port=serial_conf['file'],
+        baudrate=serial_conf['baud'],
+        timeout=serial_conf['timeout']
+    )
+    logging.debug("setting up serial sesh: %s" % ser)
+    sesh = TelecortexSession(ser)
+    sesh.reset_board()
     # listen for commands
+    while sesh:
+        cmd, args, payload = pipe.recv()
+        logging.debug("received: %s" % str((cmd, args, payload)))
+        sesh.chunk_payload_with_linenum(cmd, args, payload)
+
+class TelecortexParallelSessionManager(object):
+    # TODO: this
+    pass
 
 
-CONTROLLERS = OrderedDict([
+SERVERS = OrderedDict([
     (1, {
         'file': '/dev/cu.usbmodem144101',
         'baud': 57600,
@@ -58,16 +78,41 @@ CONTROLLERS = OrderedDict([
 def main():
     ctx = mp.get_context('spawn')
 
-    controller_threads = []
+    controller_threads = OrderedDict()
 
-    for controller_id, serial_conf in CONTROLLERS:
+    for server_id, serial_conf in SERVERS.items():
         parent_conn, child_conn = ctx.Pipe()
+
         proc = ctx.Process(
             target=controller_thread,
-            args=(serial_conf, child_conn)
+            args=(serial_conf, child_conn),
+            name="controller_%s" % server_id
         )
-        controller_threads.append((parent_conn, proc))
+        proc.start()
+        controller_threads[server_id] = (parent_conn, proc)
 
+    logging.debug("created connections")
+
+    frameno = 0
+
+    while True:
+        for server_id, (pipe, proc) in controller_threads.items():
+            for panel in range(PANELS):
+                panel_length = PANEL_LENGTHS[panel]
+                pixel_list = [
+                    [(frameno + pixel) % 256, 255, 127]
+                    for pixel in range(panel_length)
+                ]
+                pixel_str = pix_array2text
+                pixel_list = list(itertools.chain(*pixel_list))
+                pixel_str = pix_array2text(*pixel_list)
+                logging.debug("sending M2601 on panel %s" % panel)
+                pipe.send(("M2601", {"Q":panel}, pixel_str))
+
+        for server_id, (pipe, proc) in controller_threads.items():
+            pipe.send(("M2610", None, None))
+
+        frameno = (frameno + 1) % 255
 
 if __name__ == '__main__':
     main()
