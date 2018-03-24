@@ -94,28 +94,28 @@ SERVERS = OrderedDict([
 
 PANELS = OrderedDict([
     (0, [
-        # (0, 'big'),
+        (0, 'big'),
         (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
+        (2, 'smol'),
+        (3, 'smol')
     ]),
     (1, [
-        # (0, 'big'),
+        (0, 'big'),
         (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
+        (2, 'smol'),
+        (3, 'smol')
     ]),
     (2, [
-        # (0, 'big'),
+        (0, 'big'),
         (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
+        (2, 'smol'),
+        (3, 'smol')
     ]),
     (3, [
-        # (0, 'big'),
+        (0, 'big'),
         (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
+        (2, 'smol'),
+        (3, 'smol')
     ]),
     (4, [
         # (0, 'big'),
