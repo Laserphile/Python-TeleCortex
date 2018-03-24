@@ -200,12 +200,13 @@ class TelecortexSession(object):
 
     @classmethod
     def from_serial_conf(cls, serial_conf, linenum=0):
+        # TODO: I don't think this works because of garbage collection?
         ser = serial.Serial(
             port=serial_conf.get('port'),
             baudrate=serial_conf.get('baud', DEFAULT_BAUDRATE),
             timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
         )
-        return TelecortexSession.from_serial_obj(ser)
+        return cls(ser, linenum)
 
     def fmt_cmd(self, linenum=None, cmd=None, args=None):
         raise DeprecationWarning("create cmd object and format instead")
@@ -235,12 +236,7 @@ class TelecortexSession(object):
         self.send_cmd_obj(cmd_obj)
         logging.debug("sending cmd without lineno %s" % repr(cmd_obj.fmt()))
 
-    def reset_board(self):
-
-        self.ser.reset_output_buffer()
-        self.ser.flush()
-        self.send_cmd_without_linenum("M9999")
-
+    def flush_in(self):
         # wiggle DTR and CTS (only works with AVR boards)
         self.ser.dtr = not self.ser.dtr
         self.ser.rts = not self.ser.rts
@@ -252,6 +248,11 @@ class TelecortexSession(object):
         while self.ser.in_waiting:
             self.get_line()
 
+    def reset_board(self):
+
+        self.ser.reset_output_buffer()
+        self.send_cmd_without_linenum("M9999")
+        self.flush_in()
         self.set_linenum(0)
 
     def get_cid(self):
@@ -266,7 +267,9 @@ class TelecortexSession(object):
         self.cid = response[1:]
         return self.cid
 
-    def chunk_payload_with_linenum(self, cmd, static_args, payload):
+    def chunk_payload_with_linenum(self, cmd, static_args, payload=None):
+        if payload is None:
+            self.send_cmd_with_linenum(cmd, static_args)
         offset = 0
         while payload:
             chunk_args = deepcopy(static_args)
@@ -554,7 +557,6 @@ servers is a list of objects containing information about a server's configurati
 
 
 class TelecortexSessionManager(object):
-    # TODO: This
     def __init__(self, servers):
         self.servers = servers
         self.sessions = OrderedDict()
