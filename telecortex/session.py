@@ -181,29 +181,6 @@ class TelecortexSession(object):
         r"PIX_RATE:\s+(?P<pix_rate>[\d\.]+)\s*pps,?\s*"
         r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
     ) % re_loo
-    # re_loo_timing = (
-    #     r"%s"
-    #     r"TIME:\s+(?P<time>\d+),?\s*"
-    # ) % re_loo
-    # re_loo_get_stats = (
-    #     r"%s"
-    #     r"GET_CMD:\s+(?P<get_cmd>\d+),?\s*"
-    #     r"ENQD:\s+(?P<enqd>\d+),?\s*"
-    # ) % re_loo
-    # re_loo_proc_stats = (
-    #     r"%s"
-    #     r"CMD:\s+(?P<cmd>[A-Z] \d+),?\s*"
-    #     r"PIXLS:\s+(?P<pixls>\d+),?\s*"
-    #     r"PROC_CMD:\s+(?P<proc_cmd>\d+),?\s*"
-    #     r"PARSE_CMD:\s+(?P<parse_cmd>\d+),?\s*"
-    #     r"PR_PA_CMD:\s+(?P<pr_pa_cmd>\d+),?\s*"
-    # ) % re_loo
-    # re_loo_get_cmd_time = r"%sget_cmd: (?P<time>[\d\.]+)" % re_loo
-    # re_loo_process_cmd_time = r"%sprocess_cmd: (?P<time>[\d\.]+)" % re_loo
-    # re_enq = r"^;ENQ: "
-    # re_gco = r"^;GCO: "
-    # re_gco_encoded = r"%s-> payload: " % re_gco
-    # re_gco_decoded = r"%s-> decoded payload: " % re_gco
     do_crc = True
 
     def __init__(self, ser, linecount=0):
