@@ -352,7 +352,18 @@ class TelecortexSession(object):
                 self.ack_queue.keys()
             ))
 
-    def handle_error(self, errnum, err, linenum=None):
+    def handle_error(self, **kwargs):
+        try:
+            linenum = int(kwargs.get('linenum', None))
+        except (ValueError, TypeError):
+            linenum = None
+        try:
+            errnum = int(kwargs.get('errnum', None))
+        except (ValueError, TypeError):
+            errnum = None
+
+        err = kwargs.get('err', None)
+
         warning = "error %s: %s" % (
             errnum,
             err
@@ -378,27 +389,20 @@ class TelecortexSession(object):
         else:
             raise UserWarning(warning)
 
-    def handle_error_match(self, matchdict):
+    def handle_line_response(self, **kwargs):
         try:
-            linenum = int(matchdict.get('linenum', None))
-        except (ValueError, TypeError):
-            linenum = None
-        try:
-            errnum = int(matchdict.get('errnum', None))
-        except (ValueError, TypeError):
-            errnum = None
-
-        self.handle_error(errnum, matchdict.get('err', None), linenum)
-
-    def handle_line_response_match(self, matchdict):
-        try:
-            linenum = int(matchdict.get('linenum', None))
+            linenum = int(kwargs.get('linenum', None))
         except (ValueError, TypeError):
             linenum = None
         # TODO: finish this
-        self.responses[linenum] = matchdict.get('response', '')
+        self.responses[linenum] = kwargs.get('response', '')
 
-    def handle_resend(self, linenum):
+    def handle_resend(self, **kwargs):
+        try:
+            linenum = int(kwargs.get('linenum', None))
+        except (ValueError, TypeError):
+            linenum = None
+
         if linenum not in self.ack_queue:
             error = "CID: %s could not resend unknown linenum: %d" % (self.cid, linenum)
             logging.error(error)
@@ -416,14 +420,6 @@ class TelecortexSession(object):
         for resend_linenum, resend_command in old_queue.items():
             if resend_linenum >= self.linecount:
                 self.send_cmd_with_linenum(*resend_command)
-
-    def handle_resend_match(self, matchdict):
-        try:
-            linenum = int(matchdict.get('linenum', None))
-        except (ValueError, TypeError):
-            linenum = None
-
-        self.handle_resend(linenum)
 
     def set_linenum(self, linenum):
         self.send_cmd_with_linenum(
@@ -483,20 +479,20 @@ class TelecortexSession(object):
                 self.handle_line_ok_match(match)
             elif re.match(self.re_line_error, line):
                 match = re.search(self.re_line_error, line).groupdict()
-                self.handle_error_match(match)
+                self.handle_error(**match)
             elif re.match(self.re_line_response, line):
                 match = re.search(self.re_line_response, line).groupdict()
-                self.handle_line_response_match(match)
+                self.handle_line_response(**match)
         elif line.startswith("E"):
             self.action_idle = False
             if re.match(self.re_error, line):
                 match = re.search(self.re_error, line).groupdict()
-                self.handle_error_match(match)
+                self.handle_error(**match)
         elif line.startswith("RS"):
             self.action_idle = False
             if re.match(self.re_resend, line):
                 match = re.search(self.re_resend, line).groupdict()
-                self.handle_resend_match(match)
+                self.handle_resend(**match)
         else:
             logging.warn(
                 "CID: %s line not recognised:\n%s\n" % (
