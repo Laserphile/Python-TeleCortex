@@ -118,10 +118,10 @@ PANELS = OrderedDict([
         (3, 'smol')
     ]),
     (4, [
-        # (0, 'big'),
+        (0, 'big'),
         (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
+        (2, 'smol'),
+        (3, 'smol')
     ])
 ])
 
