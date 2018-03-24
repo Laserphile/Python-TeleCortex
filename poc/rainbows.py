@@ -58,6 +58,9 @@ def main():
         target_device = TELECORTEX_DEV
     if not target_device:
         raise UserWarning("target device not found")
+    else:
+        logging.debug("target_device: %s" % target_device)
+        logging.debug("baud: %s" % TELECORTEX_BAUD)
     # Connect to serial
     frameno = 0
     with serial.Serial(
@@ -76,10 +79,7 @@ def main():
                     pixel_str = pix_array2text(
                         frameno, 255, 127
                     )
-                    sesh.send_cmd_with_linenum(
-                        "M2603",
-                        {"Q": panel, "V": pixel_str}
-                    )
+                    sesh.send_cmd_sync("M2603", {"Q":panel, "V":pixel_str})
                 else:
                     panel_length = PANEL_LENGTHS[panel]
                     # logging.debug(
@@ -93,7 +93,7 @@ def main():
                     pixel_list = list(itertools.chain(*pixel_list))
                     pixel_str = pix_array2text(*pixel_list)
                     sesh.chunk_payload_with_linenum("M2601", {"Q":panel}, pixel_str)
-            sesh.send_cmd_with_linenum("M2610")
+            sesh.send_cmd_sync("M2610")
             frameno = (frameno + 1) % 255
 
 
