@@ -37,6 +37,7 @@ PANEL_LENGTHS = [
 ]
 PANELS = len(PANEL_LENGTHS)
 
+
 def find_serial_dev(vid=None, pid=None, ser=None):
     """
     Given a Vendor ID and (optional) Product ID, enumerate the serial ports
@@ -65,14 +66,15 @@ def find_serial_dev(vid=None, pid=None, ser=None):
         target_device = port_info.device
         return target_device
 
-def query_serial_dev(vid=None, pid=None, ser=None):
+
+def query_serial_dev(vid=None, pid=None, ser=None, dev=None):
     """
     Given a Vendor ID and (optional) Product ID, return the serial ports which
     match these parameters
     """
     logging.debug(
-        "Querying for: VID: %s, PID: %s, SER: %s",
-        repr(vid), repr(pid), repr(ser)
+        "Querying for: VID: %s, PID: %s, SER: %s, DEV: %s",
+        repr(vid), repr(pid), repr(ser), repr(dev)
     )
     matching_devs = []
     for port_info in list_ports.comports():
@@ -90,6 +92,9 @@ def query_serial_dev(vid=None, pid=None, ser=None):
         if ser is not None and port_info.serial_number != str(ser):
             logging.debug("ser not match %s | %s", ser, port_info.serial_number)
             continue
+        if dev is not None and port_info.device != dev:
+            logging.debug("dev not match %s | %s", ser, port_info.serial_number)
+            continue
         logging.info("found target device: %s" % port_info.device)
         target_device = port_info.device
         matching_devs.append(target_device)
@@ -103,52 +108,6 @@ class TelecortexCommand(object):
         self.cmd = cmd
         self.args = args
         self.bytes_occupied = None
-
-    @classmethod
-    def fmt_cmd_args(cls, cmd, args):
-        if args:
-            return " ".join(
-                [cmd] + [
-                    "%s%s" % (key, value) for key, value in args.items()
-                ]
-            )
-        return cmd
-
-    def add_checksum(self, cmd):
-        checksum = 0
-        if cmd[-1] != ' ':
-            cmd += ' '
-        for c in cmd:
-            checksum ^= ord(c)
-        return cmd + "*%d" % checksum
-
-    def fmt(self, checksum=False):
-        cmd = self.fmt_cmd_args(self.cmd, self.args)
-        if checksum:
-            cmd = self.add_checksum(cmd)
-        return cmd
-
-class TelecortexLineCommand(TelecortexCommand):
-    """
-    Telecortex Command which has a linenumber
-    """
-    def __init__(self, owner, linenum, cmd, args=None):
-        super(TelecortexLineCommand, self).__init__(cmd, args)
-        self.owner = owner
-        self.linenum = linenum
-
-    @classmethod
-    def fmt_line_cmd_args(cls, line, cmd, args):
-        return "N%d %s" % (
-            line,
-            cls.fmt_cmd_args(cmd, args)
-        )
-
-    def fmt(self, checksum=False):
-        cmd = self.fmt_line_cmd_args(self.linenum, self.cmd, self.args)
-        if checksum:
-            cmd = self.add_checksum(cmd)
-        return cmd
 
 class TelecortexSession(object):
     """
@@ -273,7 +232,7 @@ class TelecortexSession(object):
                 chunk_args
             )
             # 4 bytes per pixel because base64 encoded 24bit RGB
-            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n'))/4)
+            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
 
             assert \
                 pixels_left > 0, \
@@ -281,14 +240,14 @@ class TelecortexSession(object):
                     skeleton_cmd,
                     self.chunk_size
                 )
-            chunk_args['V'] = "".join(payload[:(pixels_left*4)])
+            chunk_args['V'] = "".join(payload[:(pixels_left * 4)])
 
             self.send_cmd_with_linenum(
                 cmd,
                 chunk_args
             )
 
-            payload = payload[(pixels_left*4):]
+            payload = payload[(pixels_left * 4):]
             offset += pixels_left
 
     def chunk_payload_without_linenum(self, cmd, static_args, payload):
@@ -303,21 +262,21 @@ class TelecortexSession(object):
                 chunk_args
             )
             # 4 bytes per pixel because base64 encoded 24bit RGB
-            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n'))/4)
+            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
             assert \
                 pixels_left > 0, \
                 "not enough bytes left to chunk cmd, skeleton: %s, chunk_size: %s" % (
                     skeleton_cmd,
                     self.chunk_size
                 )
-            chunk_args['V'] = "".join(payload[:(pixels_left*4)])
+            chunk_args['V'] = "".join(payload[:(pixels_left * 4)])
 
             self.send_cmd_without_linenum(
                 cmd,
                 chunk_args
             )
 
-            payload = payload[(pixels_left*4):]
+            payload = payload[(pixels_left * 4):]
             offset += pixels_left
 
     def clear_ack_queue(self):
@@ -545,9 +504,11 @@ class TelecortexSession(object):
     def close(self):
         self.ser.close()
 
+
 """
 servers is a list of objects containing information about a server's configuration.
 """
+
 
 class TelecortexSessionManager(object):
     # TODO: This
@@ -579,13 +540,18 @@ class TelecortexSessionManager(object):
 
             # if session does not exist, create a new one
             dev_kwargs = {}
-            for key in ['vid', 'pid', 'ser']:
+            for key in ['vid', 'pid', 'ser', 'dev']:
                 if key in server_info:
                     dev_kwargs[key] = server_info[key]
 
             if IGNORE_SERIAL_NO:
                 if 'ser' in dev_kwargs:
                     del dev_kwargs['ser']
+                if 'vid' in dev_kwargs:
+                    del dev_kwargs['vid']
+                if 'pid' in dev_kwargs:
+                    del dev_kwargs['pid']
+
 
             ports = query_serial_dev(**dev_kwargs)
             if not ports:
@@ -608,7 +574,6 @@ class TelecortexSessionManager(object):
                 logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
 
-
     def close(self):
         for server_id, session in self.sessions.items():
             session.close()
@@ -630,9 +595,9 @@ SERVERS = OrderedDict([
     (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058621', 'baud':57600, 'cid':5})
 ])
 
-SERVERS = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483})
-])
+# SERVERS = OrderedDict([
+#    (0, {'vid': 0x16C0, 'pid': 0x0483})
+# ])
 
 def main():
     manager = TelecortexSessionManager(SERVERS)

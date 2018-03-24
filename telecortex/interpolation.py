@@ -70,6 +70,7 @@ def interpolate_pixel(image, coordinates, interp_type=None):
     pixel_r = blend_pixel(pixel_tr, pixel_br, coordinate_fractional[1])
     return blend_pixel(pixel_l, pixel_r, coordinate_fractional[0])
 
+
 def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
     """
     Generate a pixel list from an image and a pixel map.

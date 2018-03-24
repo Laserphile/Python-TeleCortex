@@ -59,6 +59,7 @@ ANIM_SPEED = 3
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
+
 def fill_rainbows(image, angle=0):
     draw_api = ImageDraw(image)
     for col in range(IMG_SIZE):
@@ -68,6 +69,7 @@ def fill_rainbows(image, angle=0):
         rgb = ImageColor.getrgb(colour_string)
         # logging.warning("rgb: %s" % (rgb,))
         draw_api.line([(col, 0), (col, IMG_SIZE)], fill=rgb)
+
 
 def draw_map(test_img, pix_map_normlized, outline=None):
     if outline is None:
@@ -92,8 +94,8 @@ def blend_pixel(pixel_a, pixel_b, coefficient):
         int(np.interp(coefficient, [0, 1], [pixel_a[2], pixel_b[2]])),
     )
 
-def interpolate_pixel(image, coordinates, interp_type=None):
 
+def interpolate_pixel(image, coordinates, interp_type=None):
     if interp_type is None:
         interp_type = 'nearest'
 
@@ -135,6 +137,7 @@ def interpolate_pixel(image, coordinates, interp_type=None):
     pixel_4 = blend_pixel(pixel_0, pixel_1, pix_coefficients[0])
     pixel_5 = blend_pixel(pixel_2, pixel_3, pix_coefficients[0])
     return blend_pixel(pixel_4, pixel_5, pix_coefficients[1])
+
 
 def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
     """
@@ -188,7 +191,7 @@ def main():
 
     start_time = time_now()
     with serial.Serial(
-        port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
+            port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
     ) as ser:
         sesh = TelecortexSession(ser)
         sesh.reset_board()

@@ -127,6 +127,7 @@ PIXEL_MAP_BIG = np.array([
     [2494, 2050]
 ])
 
+
 def normalize_pix_map(pix_map):
     """Return a normalized copy of `pixel map` all x, y between 0, 1."""
     normalized = pix_map.astype(np.float64)
@@ -147,11 +148,12 @@ def normalize_pix_map(pix_map):
     # )
 
     normalized[..., [0, 1]] -= [pix_min_x, pix_min_y]
-    normalized *= (1/pix_breadth_max)
+    normalized *= (1 / pix_breadth_max)
 
     # TODO: probably need to centre this better
 
     return normalized
+
 
 def mat_rotation_2d(angle):
     """
@@ -161,13 +163,16 @@ def mat_rotation_2d(angle):
     val_cos, val_sin = np.cos(theta), np.sin(theta)
     return np.matrix([[val_cos, -val_sin], [val_sin, val_cos]])
 
+
 def vector_transform(vector, matrix):
     # TODO: fix this math
     return np.asarray(matrix * np.asmatrix(vector).transpose()).transpose()[0]
 
+
 def rotate_vector(vector, angle):
     mat = mat_rotation_2d(angle)
     return vector_transform(vector, mat)
+
 
 def scale_mapping(mapping, scalar):
     return [
@@ -175,11 +180,13 @@ def scale_mapping(mapping, scalar):
         for coordinate in mapping
     ]
 
+
 def transpose_mapping(mapping, offset):
     return [
         coordinate + offset \
         for coordinate in mapping
     ]
+
 
 def rotate_mapping(mapping, angle):
     mat = mat_rotation_2d(angle)
@@ -187,6 +194,7 @@ def rotate_mapping(mapping, angle):
         vector_transform(coordinate, mat)
         for coordinate in mapping
     ]
+
 
 PANELS = OrderedDict([
     (0, [
@@ -220,6 +228,7 @@ PANELS = OrderedDict([
         # (3, 'smol')
     ])
 ])
+
 
 def draw_map(image, pix_map_normlized, radius=1, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""
