@@ -66,11 +66,16 @@ class TelecortexSessionAsync(TelecortexSession):
     """
 
     """
+
+    def __init__(self, ser, main_loop, linecount=0):
+        super(TelecortexSessionAsync, self).__init__(ser, linecount)
+        self.main_loop = main_loop
+
     def write_line(self, text):
         logging.warning("Should never call write_line synchronously")
         return super(TelecortexSessionAsync, self).write_line(text)
 
-    async def write_line(self, text):
+    async def write_line_async(self, text):
         pass
 
     def get_line(self):
@@ -79,7 +84,7 @@ class TelecortexSessionAsync(TelecortexSession):
 
     async def get_line_async(self):
         try:
-            return await asyncio.wait_for(reader.readline(), timeout=.2)
+            return await asyncio.wait_for(self.ser.readline(), timeout=.2)
         except Exception as e:
             pass
 
