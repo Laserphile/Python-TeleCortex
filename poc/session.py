@@ -140,10 +140,10 @@ def main():
                 elif size == 'smol':
                     pixel_str = pixel_str_smol
 
-                manager.sessions[server_id].chunk_payload(
-                    "M2600", "Q%d" % panel_number, pixel_str
+                manager.sessions[server_id].chunk_payload_with_linenum(
+                    "M2600", {"Q": panel_number}, pixel_str
                 )
-            manager.sessions[server_id].send_cmd_sync('M2610')
+            manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
         if ENABLE_PREVIEW:
             draw_map(img, pix_map_normlized_smol)

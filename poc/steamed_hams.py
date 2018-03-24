@@ -128,10 +128,10 @@ def main():
                 )
                 pixel_str = pix_array2text(*pixel_list)
 
-                manager.sessions[server_id].chunk_payload(
-                    "M2600", "Q%d" % panel_number, pixel_str
+                manager.sessions[server_id].chunk_payload_with_linenum(
+                    "M2600", {"Q": panel_number}, pixel_str
                 )
-            manager.sessions[server_id].send_cmd_sync('M2610')
+            manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
         if ENABLE_PREVIEW:
             for map in pixel_map_cache.values():
