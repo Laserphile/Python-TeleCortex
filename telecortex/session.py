@@ -235,12 +235,7 @@ class TelecortexSession(object):
         self.send_cmd_obj(cmd_obj)
         logging.debug("sending cmd without lineno %s" % repr(cmd_obj.fmt()))
 
-    def reset_board(self):
-
-        self.ser.reset_output_buffer()
-        self.ser.flush()
-        self.send_cmd_without_linenum("M9999")
-
+    def flush_in(self):
         # wiggle DTR and CTS (only works with AVR boards)
         self.ser.dtr = not self.ser.dtr
         self.ser.rts = not self.ser.rts
@@ -252,6 +247,11 @@ class TelecortexSession(object):
         while self.ser.in_waiting:
             self.get_line()
 
+    def reset_board(self):
+
+        self.ser.reset_output_buffer()
+        self.send_cmd_without_linenum("M9999")
+        self.flush_in()
         self.set_linenum(0)
 
     def get_cid(self):
