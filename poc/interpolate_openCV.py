@@ -136,10 +136,10 @@ def main():
             for panel in range(PANELS):
                 # import pudb; pudb.set_trace()
                 if PANEL_LENGTHS[panel] == max(PANEL_LENGTHS):
-                    sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_big)
+                    sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str_big)
                 if PANEL_LENGTHS[panel] == min(PANEL_LENGTHS):
-                    sesh.chunk_payload("M2600", "Q%d" % panel, pixel_str_smol)
-            sesh.send_cmd_sync("M2610")
+                    sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str_smol)
+            sesh.send_cmd_with_linenum("M2610")
 
             if ENABLE_PREVIEW:
                 draw_map(test_img, pix_map_normlized_smol)

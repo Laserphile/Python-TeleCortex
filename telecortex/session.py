@@ -100,12 +100,20 @@ def query_serial_dev(vid=None, pid=None, ser=None, dev=None):
         matching_devs.append(target_device)
     return matching_devs
 
+class TelecortexCommand(object):
+    """
+    Base Telecortex Command.
+    """
+    def __init__(self, cmd, args=None):
+        self.cmd = cmd
+        self.args = args
+        self.bytes_occupied = None
 
 class TelecortexSession(object):
     """
     Manages a serial session with a Telecortex device.
 
-    When commands are sent that require acknowledgement (synchronous),
+    When commands are sent that require acknowledgement (with linenum),
     they are queued in ack_queue until the acknowledgement or error for that
     command is received.
     When
@@ -113,47 +121,25 @@ class TelecortexSession(object):
 
     # TODO: group idle debug prints
 
-    chunk_size = 255
-    ser_buff_size = 2 * (chunk_size + 4)
+    chunk_size = 256
+    ser_buff_size = 1 * chunk_size
     max_ack_queue = 5
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
-    re_line_ok = r"^N(?P<linenum>\d+):\s*OK"
+    re_line = r"^N(?P<linenum>\d+)"
+    re_line_ok = r"%s:\s*OK" % re_line
+    re_line_error = r"%s\s*" % re_line + re_error[1:]
+    re_line_response = r"%s:\s*(?P<response>\S+)" % re_line
     re_resend = r"^RS\s+(?P<linenum>\d+)"
-    re_line_error = r"^N(?P<linenum>\d+)\s*" + re_error[1:]
-    re_line_response = r"^N(?P<linenum>\d+):\s*(?P<response>\S+)"
     re_set = r"^;SET: "
     re_loo = r"^;LOO: "
     re_loo_rates = (
-                       r"%s"
-                       r"FPS:\s+(?P<fps>[\d\.]+),?\s*"
-                       r"CMD_RATE:\s+(?P<cmd_rate>[\d\.]+)\s*cps,?\s*"
-                       r"PIX_RATE:\s+(?P<pix_rate>[\d\.]+)\s*pps,?\s*"
-                       r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
-                   ) % re_loo
-    re_loo_timing = (
-                        r"%s"
-                        r"TIME:\s+(?P<time>\d+),?\s*"
-                    ) % re_loo
-    re_loo_get_stats = (
-                           r"%s"
-                           r"GET_CMD:\s+(?P<get_cmd>\d+),?\s*"
-                           r"ENQD:\s+(?P<enqd>\d+),?\s*"
-                       ) % re_loo
-    re_loo_proc_stats = (
-                            r"%s"
-                            r"CMD:\s+(?P<cmd>[A-Z] \d+),?\s*"
-                            r"PIXLS:\s+(?P<pixls>\d+),?\s*"
-                            r"PROC_CMD:\s+(?P<proc_cmd>\d+),?\s*"
-                            r"PARSE_CMD:\s+(?P<parse_cmd>\d+),?\s*"
-                            r"PR_PA_CMD:\s+(?P<pr_pa_cmd>\d+),?\s*"
-                        ) % re_loo
-    re_loo_get_cmd_time = r"%sget_cmd: (?P<time>[\d\.]+)" % re_loo
-    re_loo_process_cmd_time = r"%sprocess_cmd: (?P<time>[\d\.]+)" % re_loo
-    re_enq = r"^;ENQ: "
-    re_gco = r"^;GCO: "
-    re_gco_encoded = r"%s-> payload: " % re_gco
-    re_gco_decoded = r"%s-> decoded payload: " % re_gco
+        r"%s"
+        r"FPS:\s+(?P<fps>[\d\.]+),?\s*"
+        r"CMD_RATE:\s+(?P<cmd_rate>[\d\.]+)\s*cps,?\s*"
+        r"PIX_RATE:\s+(?P<pix_rate>[\d\.]+)\s*pps,?\s*"
+        r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
+    ) % re_loo
     do_crc = True
 
     def __init__(self, ser, linecount=0):
@@ -165,52 +151,48 @@ class TelecortexSession(object):
         self.responses = OrderedDict()
         self.cid = 0
 
+    @classmethod
+    def from_serial_conf(cls, serial_conf, linenum=0):
+        ser = serial.Serial(
+            port=serial_conf.get('port'),
+            baudrate=serial_conf.get('baud', DEFAULT_BAUDRATE),
+            timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
+        )
+        return TelecortexSession.from_serial_obj(ser)
+
     def fmt_cmd(self, linenum=None, cmd=None, args=None):
-        cmd = " ".join(filter(None, [cmd, args]))
-        if linenum is not None:
-            cmd = "N%d %s" % (linenum, cmd)
-        return cmd
+        raise DeprecationWarning("create cmd object and format instead")
 
     def add_checksum(self, full_cmd):
-        checksum = 0
-        full_cmd += ' '
-        for c in full_cmd:
-            checksum ^= ord(c)
-        return full_cmd + "*%d" % checksum
+        raise DeprecationWarning("create cmd object add instead")
 
-    def send_cmd_sync(self, cmd, args=None):
-        while self.ser.in_waiting:
+    def send_cmd_obj(self, cmd_obj):
+        full_cmd = cmd_obj.fmt(checksum=self.do_crc)
+        while self.ser.in_waiting or self.bytes_left < len(full_cmd):
             self.parse_responses()
+        cmd_obj.bytes_occupied = self.write_line(full_cmd)
+        self.last_cmd = cmd_obj
 
-        full_cmd = self.fmt_cmd(self.linecount, cmd, args)
-        if self.do_crc:
-            full_cmd = self.add_checksum(full_cmd)
-        while self.bytes_left < len(full_cmd):
-            self.parse_responses()
-
-        self.ack_queue[self.linecount] = (cmd, args)
-        logging.debug("sending cmd sync, %s" % repr(full_cmd))
-        self.write_line(full_cmd)
+    def send_cmd_with_linenum(self, cmd, args=None):
+        """
+        Send a command, expecting an eventual acknowledgement of that command later.
+        """
+        cmd_obj = TelecortexLineCommand(self, self.linecount, cmd, args)
+        self.send_cmd_obj(cmd_obj)
+        self.ack_queue[self.linecount] = cmd_obj
+        logging.debug("sending cmd with lineno, %s" % repr(cmd_obj.fmt()))
         self.linecount += 1
 
-    def send_cmd_async(self, cmd, args=None):
-        while self.ser.in_waiting:
-            self.parse_responses()
-
-        full_cmd = self.fmt_cmd(None, cmd, args)
-        if self.do_crc:
-            full_cmd = self.add_checksum(full_cmd)
-        while self.bytes_left < len(full_cmd):
-            self.parse_responses()
-
-        logging.debug("sending cmd async %s" % repr(full_cmd))
-        self.write_line(full_cmd)
+    def send_cmd_without_linenum(self, cmd, args=None):
+        cmd_obj = TelecortexCommand(cmd, args)
+        self.send_cmd_obj(cmd_obj)
+        logging.debug("sending cmd without lineno %s" % repr(cmd_obj.fmt()))
 
     def reset_board(self):
 
         self.ser.reset_output_buffer()
         self.ser.flush()
-        self.send_cmd_async("M9999")
+        self.send_cmd_without_linenum("M9999")
 
         # wiggle DTR and CTS (only works with AVR boards)
         self.ser.dtr = not self.ser.dtr
@@ -227,7 +209,7 @@ class TelecortexSession(object):
 
     def get_cid(self):
         linenum = self.linecount
-        self.send_cmd_sync("P2205")
+        self.send_cmd_with_linenum("P2205")
         while linenum not in self.responses:
             self.parse_responses()
         response = self.responses.get(linenum)
@@ -237,29 +219,59 @@ class TelecortexSession(object):
         self.cid = response[1:]
         return self.cid
 
-    def chunk_payload(self, cmd, static_args, payload, sync=True):
-        offset = 0;
+    def chunk_payload_with_linenum(self, cmd, static_args, payload):
+        offset = 0
         while payload:
-            chunk_args = static_args
+            chunk_args = deepcopy(static_args)
             if offset > 0:
-                chunk_args += " S%s" % offset
-            chunk_args += " V"
-            skeleton_cmd = self.fmt_cmd(
+                chunk_args['S'] = offset
+            chunk_args['V'] = ''
+            skeleton_cmd = TelecortexLineCommand.fmt_line_cmd_args(
                 self.linecount,
                 cmd,
                 chunk_args
             )
             # 4 bytes per pixel because base64 encoded 24bit RGB
-            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len('\r\n')) / 4)
+            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
+
             assert \
                 pixels_left > 0, \
                 "not enough bytes left to chunk cmd, skeleton: %s, chunk_size: %s" % (
                     skeleton_cmd,
                     self.chunk_size
                 )
-            chunk_args += "".join(payload[:(pixels_left * 4)])
+            chunk_args['V'] = "".join(payload[:(pixels_left * 4)])
 
-            self.send_cmd_sync(
+            self.send_cmd_with_linenum(
+                cmd,
+                chunk_args
+            )
+
+            payload = payload[(pixels_left * 4):]
+            offset += pixels_left
+
+    def chunk_payload_without_linenum(self, cmd, static_args, payload):
+        offset = 0
+        while payload:
+            chunk_args = deepcopy(static_args)
+            if offset > 0:
+                chunk_args['S'] = offset
+            chunk_args['V'] = ''
+            skeleton_cmd = TelecortexCommand.fmt_cmd_args(
+                cmd,
+                chunk_args
+            )
+            # 4 bytes per pixel because base64 encoded 24bit RGB
+            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
+            assert \
+                pixels_left > 0, \
+                "not enough bytes left to chunk cmd, skeleton: %s, chunk_size: %s" % (
+                    skeleton_cmd,
+                    self.chunk_size
+                )
+            chunk_args['V'] = "".join(payload[:(pixels_left * 4)])
+
+            self.send_cmd_without_linenum(
                 cmd,
                 chunk_args
             )
@@ -285,13 +297,13 @@ class TelecortexSession(object):
                 del self.ack_queue[ack_linenum]
         else:
             logging.warn((
-                             "received an acknowledgement "
-                             "for an unknown command: %s"
-                             "known linenums: %s"
-                         ) % (
-                             self.last_line,
-                             self.ack_queue.keys()
-                         ))
+                "received an acknowledgement "
+                "for an unknown command: %s"
+                "known linenums: %s"
+            ) % (
+                self.last_line,
+                self.ack_queue.keys()
+            ))
 
     def handle_error(self, errnum, err, linenum=None):
         warning = "error %s: %s" % (
@@ -356,7 +368,7 @@ class TelecortexSession(object):
         self.linecount = linenum
         for resend_linenum, resend_command in old_queue.items():
             if resend_linenum >= self.linecount:
-                self.send_cmd_sync(*resend_command)
+                self.send_cmd_with_linenum(*resend_command)
 
     def handle_resend_match(self, matchdict):
         try:
@@ -367,7 +379,10 @@ class TelecortexSession(object):
         self.handle_resend(linenum)
 
     def set_linenum(self, linenum):
-        self.send_cmd_sync("M110", "N%d" % linenum)
+        self.send_cmd_with_linenum(
+            "M110",
+            {"N": linenum}
+        )
         self.linecount = linenum + 1
 
         while self.ack_queue:
@@ -384,77 +399,77 @@ class TelecortexSession(object):
         if six.PY2:
             byte_array = six.binary_type(text)
         self.ser.write(byte_array)
+        return len(byte_array)
 
     def get_line(self):
         line = self.ser.readline()
         line = converters.to_unicode(line)
-        if len(line) > 1:
-            if line[-1] == '\n':
-                line = line[:-1]
-            if line[-1] == '\r':
-                line = line[:-1]
+        line = re.split(r"[\r\n]+", line)[0]
         logging.debug("received line: %s" % line)
         self.last_line = line
         return line
 
-    def parse_responses(self):
-        line = self.get_line()
-        idles_recvd = 0
-        action_idle = True
-        while True:
-            if line.startswith("IDLE"):
-                idles_recvd += 1
-            elif line.startswith(";"):
-                if re.match(self.re_loo_rates, line):
-                    match = re.search(self.re_loo_rates, line).groupdict()
-                    pix_rate = int(match.get('pix_rate'))
-                    cmd_rate = int(match.get('cmd_rate'))
-                    fps = int(match.get('fps'))
-                    queue_occ = int(match.get('queue_occ'))
-                    queue_max = int(match.get('queue_max'))
-                    logging.warning(
-                        "CID: %2s FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
-                            self.cid, fps, cmd_rate, pix_rate,
-                            "%s / %s" % (queue_occ, queue_max)
-                        )
-                    )
-                elif re.match(self.re_set, line):
-                    logging.info(line)
-            elif line.startswith("N"):
-                action_idle = False
-                # either "N\d+: OK" or N\d+: E\d+:
-                if re.match(self.re_line_ok, line):
-                    match = re.search(self.re_line_ok, line).groupdict()
-                    self.handle_line_ok_match(match)
-                elif re.match(self.re_line_error, line):
-                    match = re.search(self.re_line_error, line).groupdict()
-                    self.handle_error_match(match)
-                elif re.match(self.re_line_response, line):
-                    match = re.search(self.re_line_response, line).groupdict()
-                    self.handle_line_response_match(match)
-            elif line.startswith("E"):
-                action_idle = False
-                if re.match(self.re_error, line):
-                    match = re.search(self.re_error, line).groupdict()
-                    self.handle_error_match(match)
-            elif line.startswith("RS"):
-                action_idle = False
-                if re.match(self.re_resend, line):
-                    match = re.search(self.re_resend, line).groupdict()
-                    self.handle_resend_match(match)
-            else:
-                logging.warn(
-                    "CID: %s line not recognised:\n%s\n" % (
-                        self.cid,
-                        repr(line.encode('ascii', errors='backslashreplace'))
+    def parse_response(self, line):
+        if line.startswith("IDLE"):
+            self.idles_recvd += 1
+        elif line.startswith(";"):
+            if re.match(self.re_loo_rates, line):
+                match = re.search(self.re_loo_rates, line).groupdict()
+                pix_rate = int(match.get('pix_rate'))
+                cmd_rate = int(match.get('cmd_rate'))
+                fps = int(match.get('fps'))
+                queue_occ = int(match.get('queue_occ'))
+                queue_max = int(match.get('queue_max'))
+                logging.warning(
+                    "CID: %2s FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
+                        self.cid, fps, cmd_rate, pix_rate,
+                        "%s / %s" % (queue_occ, queue_max)
                     )
                 )
+            elif re.match(self.re_set, line):
+                logging.info(line)
+        elif line.startswith("N"):
+            self.action_idle = False
+            # either "N\d+: OK" or N\d+: E\d+:
+            if re.match(self.re_line_ok, line):
+                match = re.search(self.re_line_ok, line).groupdict()
+                self.handle_line_ok_match(match)
+            elif re.match(self.re_line_error, line):
+                match = re.search(self.re_line_error, line).groupdict()
+                self.handle_error_match(match)
+            elif re.match(self.re_line_response, line):
+                match = re.search(self.re_line_response, line).groupdict()
+                self.handle_line_response_match(match)
+        elif line.startswith("E"):
+            self.action_idle = False
+            if re.match(self.re_error, line):
+                match = re.search(self.re_error, line).groupdict()
+                self.handle_error_match(match)
+        elif line.startswith("RS"):
+            self.action_idle = False
+            if re.match(self.re_resend, line):
+                match = re.search(self.re_resend, line).groupdict()
+                self.handle_resend_match(match)
+        else:
+            logging.warn(
+                "CID: %s line not recognised:\n%s\n" % (
+                    self.cid,
+                    repr(line.encode('ascii', errors='backslashreplace'))
+                )
+            )
+
+    def parse_responses(self):
+        line = self.get_line()
+        self.idles_recvd = 0
+        self.action_idle = True
+        while True:
+            self.parse_response(line)
             if not self.ser.in_waiting:
                 break
             line = self.get_line()
-        if idles_recvd > 0:
-            logging.info('Idle received x %s' % idles_recvd)
-        if action_idle and idles_recvd:
+        if self.idles_recvd > 0:
+            logging.info('Idle received x %s' % self.idles_recvd)
+        if self.action_idle and self.idles_recvd:
             self.clear_ack_queue()
         # else:
         #     logging.debug("did not recieve IDLE")
@@ -463,9 +478,9 @@ class TelecortexSession(object):
     def bytes_left(self):
         ser_buff_len = 0
         for linenum, ack_cmd in self.ack_queue.items():
-            if ack_cmd[0] == "M110":
+            if ack_cmd.cmd == "M110":
                 return 0
-            ser_buff_len += len(self.fmt_cmd(linenum, *ack_cmd))
+            ser_buff_len += ack_cmd.bytes_occupied
             if ser_buff_len > self.ser_buff_size:
                 return 0
         return self.ser_buff_size - ser_buff_len
@@ -573,20 +588,27 @@ class TelecortexSessionManager(object):
 
 
 SERVERS = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4057531', 'baud': 57600, 'cid': 1}),
-    (1, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4058601', 'baud': 57600, 'cid': 2}),
-    (2, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem3176951', 'baud': 57600, 'cid': 3}),
-    (3, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4057541', 'baud': 57600, 'cid': 4}),
-    (4, {'vid': 0x16C0, 'pid': 0x0483, 'dev': '/dev/cu.usbmodem4058621', 'baud': 57600, 'cid': 5})
+    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
+    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
+    (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3}),
+    (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4}),
+    (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058621', 'baud':57600, 'cid':5})
 ])
 
+# SERVERS = OrderedDict([
+#    (0, {'vid': 0x16C0, 'pid': 0x0483})
+# ])
 
 def main():
     manager = TelecortexSessionManager(SERVERS)
-    for sesh in manager.sessions.values():
-        for panel_number, _ in enumerate(PANEL_LENGTHS):
-            sesh.send_cmd_sync("M2602", "Q%d V////" % panel_number)
-        sesh.send_cmd_sync("M2610")
+    while manager:
+        for sesh in manager.sessions.values():
+            for panel_number, _ in enumerate(PANEL_LENGTHS):
+                sesh.send_cmd_with_linenum(
+                    "M2602",
+                    {"Q": panel_number, "V": "////"}
+                )
+            sesh.send_cmd_with_linenum("M2610")
 
 
 if __name__ == '__main__':

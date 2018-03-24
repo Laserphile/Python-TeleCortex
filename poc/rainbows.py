@@ -16,10 +16,10 @@ from telecortex.session import (PANEL_LENGTHS, PANELS, TELECORTEX_BAUD,
                                 TELECORTEX_VID, find_serial_dev, TelecortexSession)
 from telecortex.util import pix_array2text
 
-# STREAM_LOG_LEVEL = logging.INFO
-# STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.DEBUG
-STREAM_LOG_LEVEL = logging.ERROR
+# STREAM_LOG_LEVEL = logging.INFO
+STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".rainbowz.log"
 ENABLE_LOG_FILE = True
@@ -76,7 +76,10 @@ def main():
                     pixel_str = pix_array2text(
                         frameno, 255, 127
                     )
-                    sesh.send_cmd_sync("M2603", "Q%d V%s" % (panel, pixel_str))
+                    sesh.send_cmd_with_linenum(
+                        "M2603",
+                        {"Q": panel, "V": pixel_str}
+                    )
                 else:
                     panel_length = PANEL_LENGTHS[panel]
                     # logging.debug(
@@ -89,8 +92,8 @@ def main():
                     # logging.info("pixel_list: %s" % pformat(pixel_list))
                     pixel_list = list(itertools.chain(*pixel_list))
                     pixel_str = pix_array2text(*pixel_list)
-                    sesh.chunk_payload("M2601", "Q%d" % panel, pixel_str)
-            sesh.send_cmd_sync("M2610")
+                    sesh.chunk_payload_with_linenum("M2601", {"Q":panel}, pixel_str)
+            sesh.send_cmd_with_linenum("M2610")
             frameno = (frameno + 1) % 255
 
 

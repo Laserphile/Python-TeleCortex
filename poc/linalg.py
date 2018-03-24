@@ -28,7 +28,7 @@ from telecortex.util import pix_array2text
 STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
-LOG_FILE = ".sesssion.log"
+LOG_FILE = ".linalg.log"
 ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
 
@@ -90,11 +90,13 @@ def main():
 
     start_time = time_now()
 
-    while manager:
+    while any([manager.sessions.get(server_id) for server_id in PANELS]):
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
         for server_id, server_panel_info in PANELS.items():
+            if not manager.sessions.get(server_id):
+                continue
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
                     if size == 'big':
@@ -115,11 +117,11 @@ def main():
                 )
                 pixel_str = pix_array2text(*pixel_list)
 
-                manager.sessions[server_id].chunk_payload(
-                    "M2600", "Q%d" % panel_number, pixel_str
+                manager.sessions[server_id].chunk_payload_with_linenum(
+                    "M2600", {"Q": panel_number}, pixel_str
                 )
             # import pudb; pudb.set_trace()
-            manager.sessions[server_id].send_cmd_sync('M2610')
+            manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
         if ENABLE_PREVIEW:
             for map in pixel_map_cache.values():
