@@ -38,6 +38,7 @@ PANEL_LENGTHS = [
 ]
 PANELS = len(PANEL_LENGTHS)
 
+IGNORE_ACKS = False
 
 def find_serial_dev(vid=None, pid=None, ser=None):
     """
@@ -234,7 +235,8 @@ class TelecortexSession(object):
         """
         cmd_obj = TelecortexLineCommand(self, self.linecount, cmd, args)
         self.send_cmd_obj(cmd_obj)
-        self.ack_queue[self.linecount] = cmd_obj
+        if not IGNORE_ACKS:
+            self.ack_queue[self.linecount] = cmd_obj
         logging.debug("sending cmd with lineno, %s" % repr(cmd_obj.fmt()))
         self.linecount += 1
 
