@@ -245,12 +245,12 @@ class TelecortexSession(object):
 
     def flush_in(self):
         # wiggle DTR and CTS (only works with AVR boards)
-        self.ser.dtr = not self.ser.dtr
-        self.ser.rts = not self.ser.rts
-        time.sleep(0.1)
-        self.ser.dtr = not self.ser.dtr
-        self.ser.rts = not self.ser.rts
-        time.sleep(0.5)
+        # self.ser.dtr = not self.ser.dtr
+        # self.ser.rts = not self.ser.rts
+        # time.sleep(0.1)
+        # self.ser.dtr = not self.ser.dtr
+        # self.ser.rts = not self.ser.rts
+        # time.sleep(0.5)
 
         while self.lines_avail:
             self.get_line()
@@ -454,7 +454,19 @@ class TelecortexSession(object):
             byte_array = six.binary_type(text, 'latin-1')
         if six.PY2:
             byte_array = six.binary_type(text)
+        # logging.debug(
+        #     "before write | CTS %s, DSR: %s, RTS %s, DTR %s, RI: %s, CD: %s" % (
+        #         self.ser.cts, self.ser.dsr, self.ser.rts, self.ser.dtr, self.ser.ri, self.ser.cd
+        #     )
+        # )
+        while len(byte_array) > (self.chunk_size - self.ser.out_waiting):
+            logging.debug("waiting on write out")
         self.ser.write(byte_array)
+        # logging.debug(
+        #     "after write | CTS %s, DSR: %s, RTS %s, DTR %s, RI: %s, CD: %s" % (
+        #         self.ser.cts, self.ser.dsr, self.ser.rts, self.ser.dtr, self.ser.ri, self.ser.cd
+        #     )
+        # )
         return len(byte_array)
 
     def get_line(self):
@@ -551,6 +563,8 @@ class TelecortexSession(object):
 
     @property
     def ready(self):
+        if IGNORE_ACKS:
+            return True
         if len(self.ack_queue) > self.max_ack_queue:
             return False
         ser_buff_len = 0
@@ -661,7 +675,10 @@ class TelecortexThreadManager(object):
         ser = serial.Serial(
             port=serial_conf['file'],
             baudrate=serial_conf['baud'],
-            timeout=serial_conf['timeout']
+            timeout=serial_conf['timeout'],
+            xonxoff=False,
+            # rtscts=True,
+            # dsrdtr=True
         )
         logging.debug("setting up serial sesh: %s" % ser)
         sesh = TelecortexSession(ser)
