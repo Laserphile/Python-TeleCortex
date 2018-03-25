@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from context import telecortex
 from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession, SERVERS)
+                                PANEL_LENGTHS, TelecortexSession, TelecortexThreadManager, SERVERS)
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
                                 normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
@@ -124,43 +124,6 @@ PANELS = OrderedDict([
         (3, 'smol')
     ])
 ])
-
-def controller_thread(serial_conf, pipe):
-    # setup serial device
-    ser = serial.Serial(
-        port=serial_conf['file'],
-        baudrate=serial_conf['baud'],
-        timeout=serial_conf['timeout']
-    )
-    logging.debug("setting up serial sesh: %s" % ser)
-    sesh = TelecortexSession(ser)
-    sesh.reset_board()
-    # listen for commands
-    while sesh:
-        cmd, args, payload = pipe.recv()
-        logging.debug("received: %s" % str((cmd, args, payload)))
-        sesh.chunk_payload_with_linenum(cmd, args, payload)
-
-class TelecortexThreadManager(object):
-    # TODO: this
-    def __init__(self, servers):
-        self.servers = servers
-        self.threads = OrderedDict()
-        self.refresh_connections()
-
-    def refresh_connections(self):
-        ctx = mp.get_context('spawn')
-
-        for server_id, serial_conf in SERVERS.items():
-            parent_conn, child_conn = ctx.Pipe()
-
-            proc = ctx.Process(
-                target=controller_thread,
-                args=(serial_conf, child_conn),
-                name="controller_%s" % server_id
-            )
-            proc.start()
-            self.threads[server_id] = (parent_conn, proc)
 
 def fill_rainbows(image, angle=0.0):
     for col in range(IMG_SIZE):

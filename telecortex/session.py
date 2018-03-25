@@ -17,6 +17,7 @@ from serial.tools import list_ports
 import coloredlogs
 import six
 from kitchen.text import converters
+import multiprocessing as mp
 
 # TODO: soft reset when linenum approach long int so it can run forever
 
@@ -634,6 +635,42 @@ class TelecortexSessionManager(object):
     def __exit__(self, *args, **kwargs):
         self.close()
 
+class TelecortexThreadManager(object):
+    def __init__(self, servers):
+        self.servers = servers
+        self.threads = OrderedDict()
+        self.refresh_connections()
+
+    @staticmethod
+    def controller_thread(serial_conf, pipe):
+        # setup serial device
+        ser = serial.Serial(
+            port=serial_conf['file'],
+            baudrate=serial_conf['baud'],
+            timeout=serial_conf['timeout']
+        )
+        logging.debug("setting up serial sesh: %s" % ser)
+        sesh = TelecortexSession(ser)
+        sesh.reset_board()
+        # listen for commands
+        while sesh:
+            cmd, args, payload = pipe.recv()
+            logging.debug("received: %s" % str((cmd, args, payload)))
+            sesh.chunk_payload_with_linenum(cmd, args, payload)
+
+    def refresh_connections(self):
+        ctx = mp.get_context('spawn')
+
+        for server_id, serial_conf in self.servers.items():
+            parent_conn, child_conn = ctx.Pipe()
+
+            proc = ctx.Process(
+                target=self.controller_thread,
+                args=(serial_conf, child_conn),
+                name="controller_%s" % server_id
+            )
+            proc.start()
+            self.threads[server_id] = (parent_conn, proc)
 
 SERVERS = OrderedDict([
     (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
