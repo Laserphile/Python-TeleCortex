@@ -163,30 +163,40 @@ def mat_rotation_2d(angle):
     val_cos, val_sin = np.cos(theta), np.sin(theta)
     return np.matrix([[val_cos, -val_sin], [val_sin, val_cos]])
 
+def mat_scale_2d(scalar):
+    """
+    Generate a rotation matrix from the angle in degrees.
+    """
+    return np.matrix([[scalar, 0], [0, scalar]])
 
 def vector_transform(vector, matrix):
     # TODO: fix this math
     return np.asarray(matrix * np.asmatrix(vector).transpose()).transpose()[0]
 
-
 def rotate_vector(vector, angle):
     mat = mat_rotation_2d(angle)
     return vector_transform(vector, mat)
 
-
-def scale_mapping(mapping, scalar):
+def transform_mapping(mapping, mat):
     return [
-        scalar * coordinate \
+        vector_transform(coordinate, mat)
         for coordinate in mapping
     ]
 
+def scale_mapping(mapping, scale):
+    if type(scale) == int:
+        return [
+            scale * coordinate \
+            for coordinate in mapping
+        ]
+    elif type(scale) == np.matrix:
+        return transform_mapping(mapping, scale)
 
 def transpose_mapping(mapping, offset):
     return [
         coordinate + offset \
         for coordinate in mapping
     ]
-
 
 def rotate_mapping(mapping, angle):
     mat = mat_rotation_2d(angle)
@@ -199,31 +209,31 @@ def rotate_mapping(mapping, angle):
 PANELS = OrderedDict([
     (0, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (1 * 360 / 5), rotate_vector((0, 0.265), (1 * 360 / 5))),
+        (1, 'smol', mat_scale_2d(0.5), (1 * 360 / 5), rotate_vector((0, 0.265), (1 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (1, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (2 * 360 / 5), rotate_vector((0, 0.265), (2 * 360 / 5))),
+        (1, 'smol', mat_scale_2d(0.5), (2 * 360 / 5), rotate_vector((0, 0.265), (2 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (2, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (3 * 360 / 5), rotate_vector((0, 0.265), (3 * 360 / 5))),
+        (1, 'smol', mat_scale_2d(0.5), (3 * 360 / 5), rotate_vector((0, 0.265), (3 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (3, [
         # (0, 'big'),
-        (1, 'smol', 0.5, (4 * 360 / 5), rotate_vector((0, 0.265), (4 * 360 / 5))),
+        (1, 'smol', mat_scale_2d(0.5), (4 * 360 / 5), rotate_vector((0, 0.265), (4 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (4, [
-        # (0, 'big', 0.5, -(4 * 360 / 5), rotate_vector((0, 0.265), (4 * 360 / 5))),
-        (1, 'smol', 0.5, (0 * 360 / 5), rotate_vector((0, 0.265), (0 * 360 / 5))),
+        # (0, 'big', mat_scale_2d(0.5), -(4 * 360 / 5), rotate_vector((0, 0.265), (4 * 360 / 5))),
+        (1, 'smol', mat_scale_2d(0.5), (0 * 360 / 5), rotate_vector((0, 0.265), (0 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ])
