@@ -30,7 +30,7 @@ STREAM_LOG_LEVEL = logging.WARN
 
 LOG_FILE = ".parallel.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = False
+ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -114,6 +114,7 @@ def main():
         window_flags |= cv2.WINDOW_KEEPRATIO
 
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
+        cv2.moveWindow(MAIN_WINDOW, 500, 0)
         cv2.imshow(MAIN_WINDOW, img)
 
     pixel_map_cache = OrderedDict()

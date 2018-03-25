@@ -211,45 +211,41 @@ def rotate_mapping(mapping, angle):
         for coordinate in mapping
     ]
 
+PANEL_1_SKEW = mat_scale_2d_y(0.95) * mat_scale_2d(0.5/2)
+PANEL_1_OFFSET = (0, 0.125)
+PANEL_2_SKEW = mat_rotation_2d(60) * mat_scale_2d(0.5/2)
+PANEL_2_OFFSET = (0.018, 0.25)
+CTRL_1_ROT = (1 * 360 / 5)
+
 
 PANELS = OrderedDict([
     (0, [
-        # (0, 'big'),
-        (1, 'smol', mat_scale_2d(0.5), (1 * 360 / 5), rotate_vector((0, 0.265), (1 * 360 / 5))),
+        (0, 'big', PANEL_2_SKEW, CTRL_1_ROT, rotate_vector(PANEL_2_OFFSET, CTRL_1_ROT)),
+        (1, 'smol', PANEL_1_SKEW, CTRL_1_ROT, rotate_vector(PANEL_1_OFFSET, CTRL_1_ROT)),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (1, [
-        # (0, 'big'),
-        (1, 'smol', mat_scale_2d(0.5), (2 * 360 / 5), rotate_vector((0, 0.265), (2 * 360 / 5))),
+        (0, 'big', PANEL_2_SKEW, (2 * 360 / 5), rotate_vector(PANEL_2_OFFSET, (2 * 360 / 5))),
+        (1, 'smol', PANEL_1_SKEW, (2 * 360 / 5), rotate_vector(PANEL_1_OFFSET, (2 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (2, [
-        # (0, 'big'),
-        (1, 'smol', mat_scale_2d(0.5), (3 * 360 / 5), rotate_vector((0, 0.265), (3 * 360 / 5))),
+        (0, 'big', PANEL_2_SKEW, (3 * 360 / 5), rotate_vector(PANEL_2_OFFSET, (3 * 360 / 5))),
+        (1, 'smol', PANEL_1_SKEW, (3 * 360 / 5), rotate_vector(PANEL_1_OFFSET, (3 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (3, [
-        (
-            0, 'big',
-             mat_rotation_2d(60) * mat_scale_2d(0.5),
-             (4 * 360 / 5),
-             rotate_vector((0, 0.5), (4 * 360 / 5))
-        ),
-        (
-            1, 'smol',
-            mat_scale_2d(0.5),
-            (4 * 360 / 5),
-            rotate_vector((0, 0.265), (4 * 360 / 5))
-        ),
+        (0, 'big', PANEL_2_SKEW, (4 * 360 / 5), rotate_vector(PANEL_2_OFFSET, (4 * 360 / 5))),
+        (1, 'smol', PANEL_1_SKEW, (4 * 360 / 5), rotate_vector(PANEL_1_OFFSET, (4 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (4, [
-        # (0, 'big', mat_scale_2d(0.5), (0 * 360 / 5), rotate_vector((0, 0.265), (0 * 360 / 5))),
-        (1, 'smol', mat_scale_2d(0.5), (0 * 360 / 5), rotate_vector((0, 0.265), (0 * 360 / 5))),
+        (0, 'big', PANEL_2_SKEW, (0 * 360 / 5), rotate_vector(PANEL_2_OFFSET, (0 * 360 / 5))),
+        (1, 'smol', PANEL_1_SKEW, (0 * 360 / 5), rotate_vector(PANEL_1_OFFSET, (0 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
     ])
