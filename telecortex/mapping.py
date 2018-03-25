@@ -315,6 +315,8 @@ PANELS = OrderedDict([
     ])
 ])
 
+PANELS_PER_CONTROLLER = 4
+
 
 def draw_map(image, pix_map_normlized, radius=1, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""

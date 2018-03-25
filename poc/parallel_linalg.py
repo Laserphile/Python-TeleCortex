@@ -17,7 +17,7 @@ import numpy as np
 from context import telecortex
 from mss import mss
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PANELS, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER,
+from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER,
                                 draw_map, normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
@@ -59,6 +59,7 @@ MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 1
+INTERLEAVE = False
 
 SERVERS = OrderedDict([
     (0, {
@@ -156,17 +157,29 @@ def main():
                     panel_map = transpose_mapping(panel_map, (+0.5, +0.5))
                     panel_map = transpose_mapping(panel_map, offset)
                     pixel_map_cache[(server_id, panel_number)] = panel_map
-                else:
-                    panel_map = pixel_map_cache[(server_id, panel_number)]
+
+                if INTERLEAVE:
+                    continue
+                panel_map = pixel_map_cache.get((server_id, panel_number))
 
                 pixel_list = interpolate_pixel_map(
                     img, panel_map, INTERPOLATION_TYPE
                 )
                 pixel_str = pix_array2text(*pixel_list)
-
-                # logging.debug("sending panel %s pixel str %s" % (panel_number, pixel_str))
-
                 manager.threads[server_id][0].send(("M2600", {"Q":panel_number}, pixel_str))
+
+        if INTERLEAVE:
+            for panel_number in range(PANELS_PER_CONTROLLER):
+                for server_id in PANELS.keys():
+                    panel_map = pixel_map_cache.get((server_id, panel_number))
+                    if not panel_map:
+                        continue
+
+                    pixel_list = interpolate_pixel_map(
+                        img, panel_map, INTERPOLATION_TYPE
+                    )
+                    pixel_str = pix_array2text(*pixel_list)
+                    manager.threads[server_id][0].send(("M2600", {"Q":panel_number}, pixel_str))
 
         if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 1:
             for server_id, (pipe, proc) in manager.threads.items():

@@ -449,6 +449,7 @@ class TelecortexSession(object):
     def write_line(self, text):
         # byte_array = [six.byte2int(j) for j in text]
         # byte_array = six.binary_type(text, 'latin-1')
+
         if not text[-1] == '\n':
             text = text + '\n'
         assert isinstance(text, six.text_type), "text should be text_type"
