@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import time
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from datetime import datetime
 from pprint import pformat, pprint
 from copy import deepcopy
@@ -198,6 +198,12 @@ class TelecortexSession(object):
         self.ack_queue = OrderedDict()
         self.responses = OrderedDict()
         self.cid = 0
+        self.line_buffer = ""
+        self.line_queue = deque()
+
+    @property
+    def lines_avail(self):
+        return self.ser.in_waiting
 
     @classmethod
     def from_serial_conf(cls, serial_conf, linenum=0):
@@ -217,7 +223,7 @@ class TelecortexSession(object):
 
     def send_cmd_obj(self, cmd_obj):
         full_cmd = cmd_obj.fmt(checksum=self.do_crc)
-        while self.ser.in_waiting or self.bytes_left < len(full_cmd):
+        while self.lines_avail or self.bytes_left < len(full_cmd):
             self.parse_responses()
         cmd_obj.bytes_occupied = self.write_line(full_cmd)
         self.last_cmd = cmd_obj
@@ -246,7 +252,7 @@ class TelecortexSession(object):
         self.ser.rts = not self.ser.rts
         time.sleep(0.5)
 
-        while self.ser.in_waiting:
+        while self.lines_avail:
             self.get_line()
 
     def reset_board(self):
@@ -452,12 +458,20 @@ class TelecortexSession(object):
         return len(byte_array)
 
     def get_line(self):
-        line = self.ser.readline()
-        line = converters.to_unicode(line)
-        line = re.split(r"[\r\n]+", line)[0]
-        logging.debug("received line: %s" % line)
-        self.last_line = line
-        return line
+        while self.ser.in_waiting:
+            data = self.ser.read_all()
+            self.line_buffer += converters.to_unicode(data)
+
+        if self.line_buffer:
+            lines = re.split(r"[\r\n]+", self.line_buffer)
+            self.line_queue.extend(lines[:-1])
+            self.line_buffer = lines[-1]
+
+        if self.line_queue:
+            line = self.line_queue.popleft()
+            logging.debug("received line: %s" % line)
+            self.last_line = line
+            return line
 
     def parse_response(self, line):
         if line.startswith("IDLE"):
@@ -513,9 +527,9 @@ class TelecortexSession(object):
         self.idles_recvd = 0
         self.action_idle = True
         while True:
-            self.parse_response(line)
-            if not self.ser.in_waiting:
+            if not line:
                 break
+            self.parse_response(line)
             line = self.get_line()
         if self.idles_recvd > 0:
             logging.info('Idle received x %s' % self.idles_recvd)
@@ -652,6 +666,7 @@ class TelecortexThreadManager(object):
         logging.debug("setting up serial sesh: %s" % ser)
         sesh = TelecortexSession(ser)
         sesh.reset_board()
+        sesh.get_cid()
         # listen for commands
         while sesh:
             if not pipe.poll():

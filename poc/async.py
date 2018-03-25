@@ -108,7 +108,7 @@ class SerialProtocol(asyncio.Protocol):
 
         if self.line_buffer:
             lines = re.split(r"[\r\n]+", self.line_buffer)
-            self.line_queue.extend([lines[:-1]])
+            self.line_queue.extend(lines[:-1])
             self.line_buffer = lines[-1]
 
         # if b'\n' in data:
