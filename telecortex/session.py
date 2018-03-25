@@ -171,6 +171,8 @@ class TelecortexSession(object):
 
     chunk_size = 256
     ser_buff_size = 2 * chunk_size
+    chunk_size = 261
+    ser_buff_size = int(1.2 * chunk_size)
     max_ack_queue = 5
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"

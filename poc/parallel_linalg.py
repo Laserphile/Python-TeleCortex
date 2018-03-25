@@ -4,23 +4,27 @@ import itertools
 import logging
 import multiprocessing as mp
 import os
+import sys
 from collections import OrderedDict
+from datetime import datetime
 from time import time as time_now
-
 
 import serial
 
 import coloredlogs
 import cv2
 import numpy as np
-from mss import mss
 from context import telecortex
-from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession, TelecortexThreadManager, SERVERS)
+from mss import mss
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
-                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping, draw_map)
+from telecortex.mapping import (PANELS, PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
+                                draw_map, normalize_pix_map, rotate_mapping,
+                                rotate_vector, scale_mapping,
+                                transpose_mapping)
+from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
+                                PANEL_LENGTHS, SERVERS, TelecortexSession,
+                                TelecortexSessionManager,
+                                TelecortexThreadManager)
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -30,7 +34,7 @@ STREAM_LOG_LEVEL = logging.WARN
 
 LOG_FILE = ".parallel.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
+ENABLE_PREVIEW = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -54,7 +58,7 @@ ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
-DOT_RADIUS = 3
+DOT_RADIUS = 1
 
 SERVERS = OrderedDict([
     (0, {
@@ -93,7 +97,13 @@ SERVERS = OrderedDict([
 #     }),
 # ])
 
-MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
+def fill_rainbows(image, angle=0.0):
+    for col in range(IMG_SIZE):
+        hue = (col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE ) % MAX_HUE
+        rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
+        # logging.debug("rgb: %s" % (rgb,))
+        cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
+    return image
 
 def main():
 
@@ -102,9 +112,7 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    sct = mss()
-
-    img = np.array(sct.grab(MON))
+    img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
     if ENABLE_PREVIEW:
         window_flags = 0
@@ -123,8 +131,8 @@ def main():
     start_time = time_now()
 
     while any([manager.threads.get(server_id)[1] for server_id in PANELS]):
-
-        img = np.array(sct.grab(MON))
+        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+        fill_rainbows(img, frameno)
 
         cv2.imshow(MAIN_WINDOW, np.array(img))
 
