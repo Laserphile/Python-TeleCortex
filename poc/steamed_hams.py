@@ -76,11 +76,6 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    # test_img = cv2.imread('/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg', cv2.IMREAD_COLOR)
-    # cap = cv2.VideoCapture("/Users/derwent/Desktop/Steamed Hams.mp4")
-    # cap = cv2.VideoCapture("/Users/derwent/Desktop/SampleVideo_1280x720_1mb.mp4")
-    # test_img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
-
     sct = mss()
 
     img = np.array(sct.grab(MON))
