@@ -17,7 +17,7 @@ import numpy as np
 from context import telecortex
 from mss import mss
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PANELS, PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
+from telecortex.mapping import (PANELS, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER,
                                 draw_map, normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
@@ -111,6 +111,7 @@ def main():
 
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
+    pix_map_normlized_outer = normalize_pix_map(PIXEL_MAP_OUTER)
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
@@ -145,6 +146,8 @@ def main():
                         panel_map = pix_map_normlized_big
                     elif size == 'smol':
                         panel_map = pix_map_normlized_smol
+                    elif size == 'outer':
+                        panel_map = pix_map_normlized_outer
                     else:
                         raise UserWarning('Panel not a know dimension')
                     panel_map = transpose_mapping(panel_map, (-0.5, -0.5))
