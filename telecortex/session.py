@@ -25,7 +25,7 @@ import multiprocessing as mp
 # pip install pyserial
 # python -m serial.tools.list_ports --verbose
 
-DEFAULT_BAUDRATE = 57600
+DEFAULT_BAUDRATE = 1000000
 DEFAULT_TIMEOUT = 1
 
 # Fix for this issue:
