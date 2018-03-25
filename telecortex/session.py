@@ -615,7 +615,7 @@ class TelecortexSessionManager(object):
                 sesh = TelecortexSession(ser)
                 sesh.reset_board()
                 if server_info.get('cid') is not None:
-                    cid = int(sesh.get_cid());
+                    cid = int(sesh.get_cid())
                     if cid != server_info.get('cid'):
                         ser.close()
                         continue
@@ -654,8 +654,10 @@ class TelecortexThreadManager(object):
         sesh.reset_board()
         # listen for commands
         while sesh:
+            if not pipe.poll():
+                pipe.send(None)
             cmd, args, payload = pipe.recv()
-            logging.debug("received: %s" % str((cmd, args, payload)))
+            # logging.debug("received: %s" % str((cmd, args, payload)))
             sesh.chunk_payload_with_linenum(cmd, args, payload)
 
     def refresh_connections(self):

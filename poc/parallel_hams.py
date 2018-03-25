@@ -29,8 +29,8 @@ STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".parallel.log"
-ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
+ENABLE_LOG_FILE = True
+ENABLE_PREVIEW = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -152,7 +152,15 @@ def main():
                 )
                 pixel_str = pix_array2text(*pixel_list)
 
+                # logging.debug("sending panel %s pixel str %s" % (panel_number, pixel_str))
+
                 manager.threads[server_id][0].send(("M2600", {"Q":panel_number}, pixel_str))
+
+        if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 1:
+            for server_id, (pipe, proc) in manager.threads.items():
+                while proc.is_alive() and pipe.poll():
+                    logging.debug("waiting on pipe %s" % server_id)
+                    pipe.recv()
 
         for server_id, (pipe, proc) in manager.threads.items():
             pipe.send(("M2610", None, None))
@@ -171,6 +179,7 @@ def main():
                 elif key == ord('d'):
                     import pudb
                     pudb.set_trace()
+
 
 if __name__ == '__main__':
     main()
