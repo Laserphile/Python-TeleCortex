@@ -169,8 +169,6 @@ class TelecortexSession(object):
 
     # TODO: group idle debug prints
 
-    chunk_size = 256
-    ser_buff_size = 2 * chunk_size
     chunk_size = 261
     ser_buff_size = int(1.2 * chunk_size)
     max_ack_queue = 5
