@@ -165,9 +165,15 @@ def mat_rotation_2d(angle):
 
 def mat_scale_2d(scalar):
     """
-    Generate a rotation matrix from the angle in degrees.
+    Generate a scale matrix from the scalar.
     """
     return np.matrix([[scalar, 0], [0, scalar]])
+
+def mat_scale_2d_y(scalar):
+    """
+    Generate a scale matrix in the y direction from the scalar
+    """
+    return np.matrix([[1, 0], [0, scalar]])
 
 def vector_transform(vector, matrix):
     # TODO: fix this math
@@ -226,13 +232,23 @@ PANELS = OrderedDict([
         # (3, 'smol')
     ]),
     (3, [
-        # (0, 'big'),
-        (1, 'smol', mat_scale_2d(0.5), (4 * 360 / 5), rotate_vector((0, 0.265), (4 * 360 / 5))),
+        (
+            0, 'big',
+             mat_rotation_2d(60) * mat_scale_2d(0.5),
+             (4 * 360 / 5),
+             rotate_vector((0, 0.5), (4 * 360 / 5))
+        ),
+        (
+            1, 'smol',
+            mat_scale_2d(0.5),
+            (4 * 360 / 5),
+            rotate_vector((0, 0.265), (4 * 360 / 5))
+        ),
         # (2, 'smol'),
         # (3, 'smol')
     ]),
     (4, [
-        # (0, 'big', mat_scale_2d(0.5), -(4 * 360 / 5), rotate_vector((0, 0.265), (4 * 360 / 5))),
+        # (0, 'big', mat_scale_2d(0.5), (0 * 360 / 5), rotate_vector((0, 0.265), (0 * 360 / 5))),
         (1, 'smol', mat_scale_2d(0.5), (0 * 360 / 5), rotate_vector((0, 0.265), (0 * 360 / 5))),
         # (2, 'smol'),
         # (3, 'smol')
