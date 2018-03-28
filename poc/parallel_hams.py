@@ -18,9 +18,10 @@ from context import telecortex
 from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
                                 PANEL_LENGTHS, TelecortexSession, TelecortexThreadManager, SERVERS)
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER, PANELS,
-                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping, draw_map)
+from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER, PIXEL_MAP_OUTER_FLIP,
+                                draw_map, normalize_pix_map, rotate_mapping,
+                                rotate_vector, scale_mapping,
+                                transpose_mapping)
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -63,7 +64,7 @@ SERVERS = OrderedDict([
         'timeout': 1
     }),
     (1, {
-        'file': '/dev/cu.usbmodem4058601',
+        'file': '/dev/cu.usbmodem4058621',
         'baud': 57600,
         'timeout': 1
     }),
@@ -78,7 +79,7 @@ SERVERS = OrderedDict([
         'timeout': 1
     }),
     (4, {
-        'file': '/dev/cu.usbmodem4058621',
+        'file': '/dev/cu.usbmodem4058601',
         'baud': 57600,
         'timeout': 1
     }),
@@ -102,6 +103,7 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
     pix_map_normlized_outer = normalize_pix_map(PIXEL_MAP_OUTER)
+    pix_map_normlized_outer_flip = normalize_pix_map(PIXEL_MAP_OUTER_FLIP)
 
     sct = mss()
 
@@ -140,6 +142,8 @@ def main():
                         panel_map = pix_map_normlized_smol
                     elif size == 'outer':
                         panel_map = pix_map_normlized_outer
+                    elif size == 'outer_flip':
+                        panel_map = pix_map_normlized_outer_flip
                     else:
                         raise UserWarning('Panel not a know dimension')
                     panel_map = transpose_mapping(panel_map, (-0.5, -0.5))

@@ -17,7 +17,7 @@ import numpy as np
 from context import telecortex
 from mss import mss
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER,
+from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER, PIXEL_MAP_OUTER_FLIP,
                                 draw_map, normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
@@ -34,7 +34,7 @@ STREAM_LOG_LEVEL = logging.WARN
 
 LOG_FILE = ".parallel.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = False
+ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -50,7 +50,7 @@ if ENABLE_LOG_FILE:
     LOGGER.addHandler(FILE_HANDLER)
 LOGGER.addHandler(STREAM_HANDLER)
 
-IMG_SIZE = 256
+IMG_SIZE = 512
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
@@ -59,7 +59,7 @@ MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 1
-INTERLEAVE = False
+INTERLEAVE = True
 
 SERVERS = OrderedDict([
     (0, {
@@ -68,7 +68,7 @@ SERVERS = OrderedDict([
         'timeout': 1
     }),
     (1, {
-        'file': '/dev/cu.usbmodem4058601',
+        'file': '/dev/cu.usbmodem4058621',
         'baud': 57600,
         'timeout': 1
     }),
@@ -83,7 +83,7 @@ SERVERS = OrderedDict([
         'timeout': 1
     }),
     (4, {
-        'file': '/dev/cu.usbmodem4058621',
+        'file': '/dev/cu.usbmodem4058601',
         'baud': 57600,
         'timeout': 1
     }),
@@ -113,6 +113,7 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
     pix_map_normlized_outer = normalize_pix_map(PIXEL_MAP_OUTER)
+    pix_map_normlized_outer_flip = normalize_pix_map(PIXEL_MAP_OUTER_FLIP)
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
@@ -149,6 +150,8 @@ def main():
                         panel_map = pix_map_normlized_smol
                     elif size == 'outer':
                         panel_map = pix_map_normlized_outer
+                    elif size == 'outer_flip':
+                        panel_map = pix_map_normlized_outer_flip
                     else:
                         raise UserWarning('Panel not a know dimension')
                     panel_map = transpose_mapping(panel_map, (-0.5, -0.5))
