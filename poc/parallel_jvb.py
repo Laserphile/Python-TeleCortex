@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict
 from time import time as time_now
 import coloredlogs
+# noinspection PyUnresolvedReferences
 from rainbow_driver import PanelDriver
 # noinspection PyUnresolvedReferences
 from context import telecortex
