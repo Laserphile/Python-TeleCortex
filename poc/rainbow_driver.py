@@ -42,10 +42,10 @@ class PanelDriver(object):
         logging.debug("rgb: %s" % (rgb,))
         pixel_list.append(rgb)
 
-    # def fill_rainbows(self, image, angle=0.):
-    #     for col in range(self.img_size):
-    #         hue = (col * self.max_hue / self.img_size + angle * self.max_hue / self.max_angle) % self.max_hue
-    #         rgb = tuple(int(c * 255) for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-    #         # logging.debug("rgb: %s" % (rgb,))
-    #         cv2.line(image, (col, 0), (col, self.img_size), color=rgb, thickness=1)
-    #     return image
+    def fill_rainbows(self, image, angle=0.):
+        for col in range(self.img_size):
+            hue = (col * self.max_hue / self.img_size + angle * self.max_hue / self.max_angle) % self.max_hue
+            rgb = tuple(int(c * 255) for c in colorsys.hls_to_rgb(hue, 0.5, 1))
+            # logging.debug("rgb: %s" % (rgb,))
+            cv2.line(image, (col, 0), (col, self.img_size), color=rgb, thickness=1)
+        return image

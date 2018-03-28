@@ -125,13 +125,6 @@ PANELS = OrderedDict([
     ])
 ])
 
-def fill_rainbows(image, angle=0.):
-    for col in range(IMG_SIZE):
-        hue = (col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE ) % MAX_HUE
-        rgb = tuple(int(c * 255) for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-        # logging.debug("rgb: %s" % (rgb,))
-        cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
-    return image
 
 def direct_rainbows(pix_map, angle=0.):
     pixel_list = []
