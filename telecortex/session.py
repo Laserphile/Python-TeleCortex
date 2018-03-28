@@ -689,7 +689,7 @@ class TelecortexThreadManager(object):
         sesh.get_cid()
         # listen for commands
         while sesh:
-            if not pipe.poll():
+            if not pipe.poll(timeout=0.001):
                 logging.debug("sending None")
                 pipe.send(None)
             cmd, args, payload = pipe.recv()
