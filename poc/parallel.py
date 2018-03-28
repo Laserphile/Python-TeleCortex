@@ -142,12 +142,12 @@ def direct_rainbows(pix_map, angle=0.):
         )
         hue = (magnitude * MAX_HUE + angle * MAX_HUE / MAX_ANGLE ) % MAX_HUE
         rgb = tuple(int(c * 255) for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-        logging.debug("rgb: %s" % (rgb,))
+        # logging.debug("rgb: %s" % (rgb,))
         pixel_list.append(rgb)
 
-    logging.debug("pixel_list: %s" % pformat(pixel_list))
+    # logging.debug("pixel_list: %s" % pformat(pixel_list))
     pixel_list = list(itertools.chain(*pixel_list))
-    logging.debug("pixel_list returned: %s ... " % (pixel_list[:10]))
+    # logging.debug("pixel_list returned: %s ... " % (pixel_list[:10]))
     return pixel_list
 
 def main():
