@@ -3,9 +3,7 @@ import os
 from collections import OrderedDict
 from time import time as time_now
 import coloredlogs
-# noinspection PyUnresolvedReferences
-from rainbow_driver import PanelDriver
-# noinspection PyUnresolvedReferences
+from cortex_drivers import PanelDriver
 from context import telecortex
 from telecortex.session import (TelecortexThreadManager)
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map)
