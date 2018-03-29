@@ -133,6 +133,8 @@ def main():
     frameno = 0
     while manager:
         frameno = frameno + 1
+        if frameno > 2**32:
+            frameno = 0
 
         driver = PanelDriver(pix_map_normlized_smol, pix_map_normlized_big, IMG_SIZE, MAX_HUE, MAX_ANGLE)
 
