@@ -754,6 +754,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             except OSError as exc:
                 logging.error("OSError: %s" % exc)
                 self.refresh_connections([server_id])
+                time.sleep(0.1)
                 continue
             except Exception as exc:
                 raise UserWarning("unhandled exception: %s" % str(exc))
