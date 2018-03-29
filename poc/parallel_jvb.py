@@ -1,13 +1,13 @@
 import colorsys
 import itertools
 import logging
-import multiprocessing as mp
 import math
 import os
 from collections import OrderedDict
 from time import time as time_now
 import coloredlogs
 from cortex_drivers import PanelDriver
+# noinspection PyUnresolvedReferences
 from context import telecortex
 from telecortex.session import (TelecortexThreadManager)
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map)
