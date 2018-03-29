@@ -70,6 +70,20 @@ def interpolate_pixel(image, coordinates, interp_type=None):
     pixel_r = blend_pixel(pixel_tr, pixel_br, coordinate_fractional[1])
     return blend_pixel(pixel_l, pixel_r, coordinate_fractional[0])
 
+def denormalize_coordinate(shape, coordinate):
+    min_dimension = min(shape[0], shape[1])
+    max_dimension = max(shape[0], shape[1])
+    delta_dimension = max_dimension - min_dimension
+    if shape[1] > shape[0]:
+        return tuple([
+            np.clip(min_dimension * coordinate[0], 0, shape[0] - 1),
+            np.clip(min_dimension * coordinate[1] + delta_dimension / 2, 0, shape[1] - 1)
+        ])
+    else:
+        return tuple([
+            np.clip(min_dimension * coordinate[0] + delta_dimension / 2, 0, shape[0] - 1),
+            np.clip(min_dimension * coordinate[1], 0, shape[1] - 1)
+        ])
 
 def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
     """
@@ -81,29 +95,14 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
     """
     pixel_list = []
     for pix in pix_map_normalized:
-        try:
-            min_dimension = min(image.shape[0], image.shape[1])
-            max_dimension = max(image.shape[0], image.shape[1])
-            delta_dimension = max_dimension - min_dimension
-            if image.shape[1] > image.shape[0]:
-                pix_coordinate = (
-                    np.clip(min_dimension * pix[0], 0, image.shape[0] - 1),
-                    np.clip(min_dimension * pix[1] + delta_dimension / 2, 0, image.shape[1] - 1)
-                )
-            else:
-                pix_coordinate = (
-                    np.clip(min_dimension * pix[0] + delta_dimension / 2, 0, image.shape[0] - 1),
-                    np.clip(min_dimension * pix[1], 0, image.shape[1] - 1)
-                )
-
-            pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
-        except Exception as exc:
-            import pudb; pudb.set_trace()
+        pix_coordinate = denormalize_coordinate(image.shape, pix)
+        pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
         if len(pixel_value) > 3:
             # BGRA fix
             pixel_value = tuple(pixel_value[:3])
         pixel_list.append(pixel_value)
     # logging.debug("pixel_list: %s" % pformat(pixel_list))
     pixel_list = list(itertools.chain(*pixel_list))
+    assert len(pixel_list) % 4 == 0
     # logging.debug("pixel_list returned: %s ... " % (pixel_list[:10]))
     return pixel_list
