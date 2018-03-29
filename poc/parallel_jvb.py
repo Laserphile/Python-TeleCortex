@@ -13,9 +13,9 @@ from telecortex.session import (TelecortexThreadManager)
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map)
 from telecortex.util import pix_array2text
 
-# STREAM_LOG_LEVEL = logging.DEBUG
+STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".parallel.log"
@@ -130,15 +130,13 @@ def main():
 
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
-
-    start_time = time_now()
-
+    frameno = 0
     while manager:
-        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+        frameno = frameno + 1
 
         driver = PanelDriver(pix_map_normlized_smol, pix_map_normlized_big, IMG_SIZE, MAX_HUE, MAX_ANGLE)
 
-        pixel_list_smol, pixel_list_big = driver.direct_rainbows(frameno)
+        pixel_list_smol, pixel_list_big = driver.crazy_rainbows(frameno)
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
         for server_id, server_panel_info in PANELS.items():
@@ -157,8 +155,8 @@ def main():
                     "M2600", {"Q": panel_number}, pixel_str
                 )
 
-        while not manager.all_idle:
-            logging.debug("waiting on queue")
+        # while not manager.all_idle:
+            # logging.debug("waiting on queue")
 
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
