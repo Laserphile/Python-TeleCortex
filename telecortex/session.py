@@ -591,10 +591,19 @@ class TelecortexSession(object):
 servers is a list of objects containing information about a server's configuration.
 """
 
-
-class TelecortexSessionManager(object):
+class TeleCortexBaseManager(object):
     def __init__(self, servers):
         self.servers = servers
+
+    def all_idle(self):
+        raise NotImplementedError()
+
+    def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
+        raise NotImplementedError()
+
+class TelecortexSessionManager(TeleCortexBaseManager):
+    def __init__(self, servers):
+        super(TelecortexSessionManager, self).__init__(servers)
         self.sessions = OrderedDict()
         self.refresh_connections()
 
@@ -667,9 +676,9 @@ class TelecortexSessionManager(object):
     def __exit__(self, *args, **kwargs):
         self.close()
 
-class TelecortexThreadManager(object):
+class TelecortexThreadManager(TeleCortexBaseManager):
     def __init__(self, servers):
-        self.servers = servers
+        super(TelecortexThreadManager, self).__init__(servers)
         self.threads = OrderedDict()
         self.refresh_connections()
 
@@ -743,6 +752,21 @@ class TelecortexThreadManager(object):
                 raise UserWarning("unhandled exception: %s" % str(exc))
             break
 
+class TeleCortexCacheManager(TeleCortexBaseManager):
+    def __init__(self, servers, cache_file):
+        super(TeleCortexBaseManager, self).__init__(servers)
+        self.cache_file = cache_file
+
+    def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
+        with open(self.cache_file, 'rw+') as cache:
+            cache.write_line(
+                "%s: %s" % (
+                    server_id,
+                    ", ".join([
+                        cmd, args, payload
+                    ])
+                )
+            )
 
 SERVERS = OrderedDict([
     (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
