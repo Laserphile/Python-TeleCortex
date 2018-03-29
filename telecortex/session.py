@@ -731,6 +731,13 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             self.threads[server_id] = (queue, proc)
 
     @property
+    def any_alive(self):
+        return any([self.threads.get(server_id)[1] for server_id in PANELS])
+
+    def session_active(self, server_id):
+        return self.threads.get(server_id)
+
+    @property
     def all_idle(self):
         return all([queue.empty() for (queue, proc) in self.threads.values()])
 
@@ -739,7 +746,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         while True:
             loops += 1
             if loops > 100:
-                raise UserWarning("too many retries: %s, %s" % (loops,str(server_id, cmd, args, payload)) )
+                raise UserWarning("too many retries: %s, %s" % (loops,map(str, [server_id, cmd, args, payload])) )
             try:
                 self.threads[server_id][0].put((cmd, args, payload), timeout=0.01)
             except queue.Full:
@@ -754,19 +761,30 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
 class TeleCortexCacheManager(TeleCortexBaseManager):
     def __init__(self, servers, cache_file):
-        super(TeleCortexBaseManager, self).__init__(servers)
+        super(TeleCortexCacheManager, self).__init__(servers)
         self.cache_file = cache_file
+        with open(self.cache_file, 'w') as cache:
+            cache.write('')
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
-        with open(self.cache_file, 'rw+') as cache:
-            cache.write_line(
+        with open(self.cache_file, 'a') as cache:
+            print(
                 "%s: %s" % (
                     server_id,
-                    ", ".join([
+                    ", ".join(map(str, [
                         cmd, args, payload
-                    ])
-                )
+                    ]))
+                ), file=cache
             )
+
+    def any_alive(self):
+        return True
+
+    def all_idle(self):
+        return True
+
+    def session_active(self, server_id):
+        return True
 
 SERVERS = OrderedDict([
     (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),

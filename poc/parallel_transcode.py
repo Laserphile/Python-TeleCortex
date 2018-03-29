@@ -23,8 +23,7 @@ from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PI
                                 transpose_mapping)
 from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
                                 PANEL_LENGTHS, SERVERS, TelecortexSession,
-                                TelecortexSessionManager,
-                                TelecortexThreadManager)
+                                TeleCortexCacheManager)
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -92,7 +91,7 @@ SERVERS = OrderedDict([
 
 def main():
 
-    manager = TelecortexThreadManager(SERVERS)
+    manager = TeleCortexCacheManager(SERVERS, 'BOKK.gcode')
 
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
@@ -177,7 +176,7 @@ def main():
         while not manager.all_idle:
             logging.debug("waiting on queue")
 
-        for server_id in manager.threads.keys():
+        for server_id in manager.servers.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
 

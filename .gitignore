@@ -102,3 +102,4 @@ ENV/
 *.csv
 *.0
 .idea
+*.gcode

@@ -58,31 +58,31 @@ INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 3
 
 SERVERS = OrderedDict([
-    # (0, {
-    #     'file': '/dev/cu.usbmodem4057531',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
-    # (1, {
-    #     'file': '/dev/cu.usbmodem4058621',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
+    (0, {
+        'file': '/dev/cu.usbmodem4057531',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (1, {
+        'file': '/dev/cu.usbmodem4058621',
+        'baud': 57600,
+        'timeout': 1
+    }),
     (2, {
         'file': '/dev/cu.usbmodem3176951',
         'baud': 57600,
         'timeout': 1
     }),
-    # (3, {
-    #     'file': '/dev/cu.usbmodem4057541',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
-    # (4, {
-    #     'file': '/dev/cu.usbmodem4058601',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
+    (3, {
+        'file': '/dev/cu.usbmodem4057541',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (4, {
+        'file': '/dev/cu.usbmodem4058601',
+        'baud': 57600,
+        'timeout': 1
+    }),
 ])
 
 # Uncomment for Derwent config
