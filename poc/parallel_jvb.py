@@ -1,17 +1,21 @@
+import colorsys
+import itertools
 import logging
+import math
 import os
 from collections import OrderedDict
 from time import time as time_now
 import coloredlogs
 from cortex_drivers import PanelDriver
+# noinspection PyUnresolvedReferences
 from context import telecortex
 from telecortex.session import (TelecortexThreadManager)
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map)
 from telecortex.util import pix_array2text
 
-# STREAM_LOG_LEVEL = logging.DEBUG
+STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
+# STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
 LOG_FILE = ".parallel.log"
@@ -103,21 +107,38 @@ PANELS = OrderedDict([
 ])
 
 
+def direct_rainbows(pix_map, angle=0.):
+    pixel_list = []
+    for coordinate in pix_map:
+        magnitude = math.sqrt(
+            (0.5 - coordinate[0]) ** 2 +
+            (0.5 - coordinate[1]) ** 2
+        )
+        hue = (magnitude * MAX_HUE + angle * MAX_HUE / MAX_ANGLE) % MAX_HUE
+        rgb = tuple(int(c * 255) for c in colorsys.hls_to_rgb(hue, 0.5, 1))
+        # logging.debug("rgb: %s" % (rgb,))
+        pixel_list.append(rgb)
+
+    # logging.debug("pixel_list: %s" % pformat(pixel_list))
+    pixel_list = list(itertools.chain(*pixel_list))
+    # logging.debug("pixel_list returned: %s ... " % (pixel_list[:10]))
+    return pixel_list
+
+
 def main():
     manager = TelecortexThreadManager(SERVERS)
 
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
-
-    start_time = time_now()
-
+    frameno = 0
     while manager:
-        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+        frameno = frameno + 1
+        if frameno > 2**32:
+            frameno = 0
 
         driver = PanelDriver(pix_map_normlized_smol, pix_map_normlized_big, IMG_SIZE, MAX_HUE, MAX_ANGLE)
 
-        pixel_list_smol, pixel_list_big = driver.direct_rainbows(frameno)
-
+        pixel_list_smol, pixel_list_big = driver.crazy_rainbows(frameno)
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
         for server_id, server_panel_info in PANELS.items():
@@ -131,10 +152,16 @@ def main():
                 else:
                     raise UserWarning('panel size unknown')
 
-                manager.threads[server_id][0].send(("M2600", {"Q": panel_number}, pixel_str))
+                manager.chunk_payload_with_linenum(
+                    server_id,
+                    "M2600", {"Q": panel_number}, pixel_str
+                )
 
-        for server_id, (pipe, proc) in manager.threads.items():
-            pipe.send(("M2610", None, None))
+        # while not manager.all_idle:
+            # logging.debug("waiting on queue")
+
+        for server_id in manager.threads.keys():
+            manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
 
 if __name__ == '__main__':
