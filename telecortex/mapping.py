@@ -381,8 +381,8 @@ def draw_map(image, pix_map_normlized, radius=1, outline=None):
     for pixel in pix_map_normlized:
         pix_coordinate = denormalize_coordinate(image.shape, pixel)
         pix_coordinate = (
-            int(pix_coordinate[0]),
-            int(pix_coordinate[1])
+            int(pix_coordinate[1]),
+            int(pix_coordinate[0])
         )
         cv2.circle(image, pix_coordinate, radius, outline, 1)
     return image
