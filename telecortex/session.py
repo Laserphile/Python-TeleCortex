@@ -10,6 +10,7 @@ from collections import OrderedDict, deque
 from datetime import datetime
 from pprint import pformat, pprint
 from copy import deepcopy
+import queue
 
 import serial
 from serial.tools import list_ports
@@ -673,7 +674,7 @@ class TelecortexThreadManager(object):
         self.refresh_connections()
 
     @staticmethod
-    def controller_thread(serial_conf, pipe):
+    def controller_thread(serial_conf, queue):
         # setup serial device
         ser = serial.Serial(
             port=serial_conf['file'],
@@ -689,26 +690,40 @@ class TelecortexThreadManager(object):
         sesh.get_cid()
         # listen for commands
         while sesh:
-            if not pipe.poll(timeout=0.001):
-                logging.debug("sending None")
-                pipe.send(None)
-            cmd, args, payload = pipe.recv()
+            try:
+                cmd, args, payload = queue.get(timeout=0.01)
+            except Exception as exc:
+                # logging.error(exc)
+                continue
             # logging.debug("received: %s" % str((cmd, args, payload)))
             sesh.chunk_payload_with_linenum(cmd, args, payload)
 
     def refresh_connections(self):
-        ctx = mp.get_context('spawn')
+        ctx = mp.get_context('fork')
 
         for server_id, serial_conf in self.servers.items():
-            parent_conn, child_conn = ctx.Pipe()
+            queue = mp.Queue(10)
 
             proc = ctx.Process(
                 target=self.controller_thread,
-                args=(serial_conf, child_conn),
+                args=(serial_conf, queue),
                 name="controller_%s" % server_id
             )
             proc.start()
-            self.threads[server_id] = (parent_conn, proc)
+            self.threads[server_id] = (queue, proc)
+
+    @property
+    def all_idle(self):
+        return all([queue.empty() for (queue, proc) in self.threads.values()])
+
+    def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
+        while True:
+            try:
+                self.threads[server_id][0].put((cmd, args, payload), timeout=0.01)
+            except queue.Full:
+                continue
+            break
+
 
 SERVERS = OrderedDict([
     (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),

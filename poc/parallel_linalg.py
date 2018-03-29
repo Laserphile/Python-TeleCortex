@@ -34,7 +34,7 @@ STREAM_LOG_LEVEL = logging.WARN
 
 LOG_FILE = ".parallel.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
+ENABLE_PREVIEW = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -50,16 +50,16 @@ if ENABLE_LOG_FILE:
     LOGGER.addHandler(FILE_HANDLER)
 LOGGER.addHandler(STREAM_HANDLER)
 
-IMG_SIZE = 512
+IMG_SIZE = 128
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
-ANIM_SPEED = 5
+ANIM_SPEED = 2
 MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 1
-INTERLEAVE = True
+INTERLEAVE = False
 
 SERVERS = OrderedDict([
     (0, {
@@ -169,7 +169,10 @@ def main():
                     img, panel_map, INTERPOLATION_TYPE
                 )
                 pixel_str = pix_array2text(*pixel_list)
-                manager.threads[server_id][0].send(("M2600", {"Q":panel_number}, pixel_str))
+                manager.chunk_payload_with_linenum(
+                    server_id,
+                    "M2600", {"Q":panel_number}, pixel_str
+                )
 
         if INTERLEAVE:
             for panel_number in range(PANELS_PER_CONTROLLER):
@@ -182,16 +185,18 @@ def main():
                         img, panel_map, INTERPOLATION_TYPE
                     )
                     pixel_str = pix_array2text(*pixel_list)
-                    manager.threads[server_id][0].send(("M2600", {"Q":panel_number}, pixel_str))
 
-        if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 1:
-            for server_id, (pipe, proc) in manager.threads.items():
-                while proc.is_alive() and pipe.poll():
-                    logging.debug("waiting on pipe %s" % server_id)
-                    pipe.recv()
+                    manager.chunk_payload_with_linenum(
+                        server_id,
+                        "M2600", {"Q":panel_number}, pixel_str
+                    )
 
-        for server_id, (pipe, proc) in manager.threads.items():
-            pipe.send(("M2610", None, None))
+        while not manager.all_idle:
+            logging.debug("waiting on queue")
+
+        for server_id in manager.threads.keys():
+            manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
+
 
         if ENABLE_PREVIEW:
             for panel_map in pixel_map_cache.values():

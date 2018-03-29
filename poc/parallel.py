@@ -172,10 +172,16 @@ def main():
                 elif size == 'smol':
                     pixel_str = pixel_str_smol
 
-                manager.threads[server_id][0].send(("M2600", {"Q":panel_number}, pixel_str))
+                manager.chunk_payload_with_linenum(
+                    server_id,
+                    "M2600", {"Q":panel_number}, pixel_str
+                )
 
-        for server_id, (pipe, proc) in manager.threads.items():
-            pipe.send(("M2610", None, None))
+        while not manager.all_idle:
+            logging.debug("waiting on queue")
+
+        for server_id in manager.threads.keys():
+            manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
         frameno = (frameno + 1) % 255
 

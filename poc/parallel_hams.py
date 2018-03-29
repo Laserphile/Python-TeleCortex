@@ -162,16 +162,16 @@ def main():
 
                 # logging.debug("sending panel %s pixel str %s" % (panel_number, pixel_str))
 
-                manager.threads[server_id][0].send(("M2600", {"Q":panel_number}, pixel_str))
+                manager.chunk_payload_with_linenum(
+                    server_id,
+                    "M2600", {"Q":panel_number}, pixel_str
+                )
 
-        if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 1:
-            for server_id, (pipe, proc) in manager.threads.items():
-                while proc.is_alive() and pipe.poll():
-                    logging.debug("waiting on pipe %s" % server_id)
-                    pipe.recv()
+        while not manager.all_idle:
+            logging.debug("waiting on queue")
 
-        for server_id, (pipe, proc) in manager.threads.items():
-            pipe.send(("M2610", None, None))
+        for server_id in manager.threads.keys():
+            manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
         if ENABLE_PREVIEW:
             for panel_map in pixel_map_cache.values():
