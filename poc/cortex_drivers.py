@@ -24,8 +24,8 @@ class PanelDriver(object):
         pixel_list_smol = self.calc_direct_rainbows(angle, self.pix_map_normlized_smol)
         pixel_list_big = self.calc_direct_rainbows(angle, self.pix_map_normlized_big)
 
-        log_if_correct_level(logging.DEBUG, "pixel_list returned: %s ... " % (pixel_list_smol[:10]))
-        log_if_correct_level(logging.DEBUG, "pixel_list returned: %s ... " % (pixel_list_big[:10]))
+        # log_if_correct_level(logging.DEBUG, "pixel_list returned: %s ... " % (pixel_list_smol[:10]))
+        # log_if_correct_level(logging.DEBUG, "pixel_list returned: %s ... " % (pixel_list_big[:10]))
         return pixel_list_smol, pixel_list_big
 
     def calc_direct_rainbows(self, angle, pix_map_normlized):
@@ -36,8 +36,8 @@ class PanelDriver(object):
                 (0.5 - coordinate[1]) ** 2
             )
             hue = (magnitude * self.max_hue + angle * self.max_hue / self.max_angle) % self.max_hue
-            rgb = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(hue, 1, 0.4))
-            log_if_correct_level(logging.DEBUG, "rgb: %s" % (rgb,))
+            rgb = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(hue, 1, 1))
+            # log_if_correct_level(logging.DEBUG, "rgb: %s" % (rgb,))
             pixel_list.append(rgb)
-        log_if_correct_level(logging.DEBUG, "pixel_list: %s" % pformat(pixel_list))
+        # log_if_correct_level(logging.DEBUG, "pixel_list: %s" % pformat(pixel_list))
         return list(itertools.chain(*pixel_list))

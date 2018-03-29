@@ -1,4 +1,8 @@
+import colorsys
+import itertools
 import logging
+import multiprocessing as mp
+import math
 import os
 from collections import OrderedDict
 from time import time as time_now
@@ -103,6 +107,24 @@ PANELS = OrderedDict([
 ])
 
 
+def direct_rainbows(pix_map, angle=0.):
+    pixel_list = []
+    for coordinate in pix_map:
+        magnitude = math.sqrt(
+            (0.5 - coordinate[0]) ** 2 +
+            (0.5 - coordinate[1]) ** 2
+        )
+        hue = (magnitude * MAX_HUE + angle * MAX_HUE / MAX_ANGLE) % MAX_HUE
+        rgb = tuple(int(c * 255) for c in colorsys.hls_to_rgb(hue, 0.5, 1))
+        # logging.debug("rgb: %s" % (rgb,))
+        pixel_list.append(rgb)
+
+    # logging.debug("pixel_list: %s" % pformat(pixel_list))
+    pixel_list = list(itertools.chain(*pixel_list))
+    # logging.debug("pixel_list returned: %s ... " % (pixel_list[:10]))
+    return pixel_list
+
+
 def main():
     manager = TelecortexThreadManager(SERVERS)
 
@@ -117,7 +139,6 @@ def main():
         driver = PanelDriver(pix_map_normlized_smol, pix_map_normlized_big, IMG_SIZE, MAX_HUE, MAX_ANGLE)
 
         pixel_list_smol, pixel_list_big = driver.direct_rainbows(frameno)
-
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
         for server_id, server_panel_info in PANELS.items():
@@ -131,10 +152,16 @@ def main():
                 else:
                     raise UserWarning('panel size unknown')
 
-                manager.threads[server_id][0].send(("M2600", {"Q": panel_number}, pixel_str))
+                manager.chunk_payload_with_linenum(
+                    server_id,
+                    "M2600", {"Q": panel_number}, pixel_str
+                )
 
-        for server_id, (pipe, proc) in manager.threads.items():
-            pipe.send(("M2610", None, None))
+        while not manager.all_idle:
+            logging.debug("waiting on queue")
+
+        for server_id in manager.threads.keys():
+            manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
 
 if __name__ == '__main__':
