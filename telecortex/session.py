@@ -698,10 +698,19 @@ class TelecortexThreadManager(object):
             # logging.debug("received: %s" % str((cmd, args, payload)))
             sesh.chunk_payload_with_linenum(cmd, args, payload)
 
-    def refresh_connections(self):
+    def refresh_connections(self, server_ids=None):
+        if server_ids is None:
+            server_ids = self.servers.keys()
+
         ctx = mp.get_context('fork')
 
-        for server_id, serial_conf in self.servers.items():
+        for server_id in server_ids:
+            server_info = self.threads.get(server_id, (None, None))
+            if server_info[1]:
+                server_info[1].terminate()
+
+            serial_conf = self.servers.get(server_id, {})
+
             queue = mp.Queue(10)
 
             proc = ctx.Process(
@@ -717,11 +726,21 @@ class TelecortexThreadManager(object):
         return all([queue.empty() for (queue, proc) in self.threads.values()])
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
+        loops = 0
         while True:
+            loops += 1
+            if loops > 100:
+                raise UserWarning("too many retries: %s, %s" % (loops,str(server_id, cmd, args, payload)) )
             try:
                 self.threads[server_id][0].put((cmd, args, payload), timeout=0.01)
             except queue.Full:
                 continue
+            except OSError as exc:
+                logging.error("OSError: %s" % exc)
+                self.refresh_connections([server_id])
+                continue
+            except Exception as exc:
+                raise UserWarning("unhandled exception: %s" % str(exc))
             break
 
 
