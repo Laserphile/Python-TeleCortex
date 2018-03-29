@@ -3,6 +3,7 @@ import itertools
 import logging
 import math
 import os
+import random
 from collections import OrderedDict
 from time import time as time_now
 import coloredlogs
@@ -131,14 +132,16 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
     frameno = 0
+    seed = random.random() * 50
     while manager:
         frameno = frameno + 1
-        if frameno > 2**32:
+        if frameno > 2 ** 16:
             frameno = 0
+            seed = random.random()
 
         driver = PanelDriver(pix_map_normlized_smol, pix_map_normlized_big, IMG_SIZE, MAX_HUE, MAX_ANGLE)
 
-        pixel_list_smol, pixel_list_big = driver.crazy_rainbows(frameno)
+        pixel_list_smol, pixel_list_big = driver.crazy_rainbows(frameno, seed)
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
         for server_id, server_panel_info in PANELS.items():
@@ -158,7 +161,7 @@ def main():
                 )
 
         # while not manager.all_idle:
-            # logging.debug("waiting on queue")
+        # logging.debug("waiting on queue")
 
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
