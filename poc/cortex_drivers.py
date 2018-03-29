@@ -52,6 +52,7 @@ class PanelDriver(object):
         pixel_list = []
         speed_factor = 100
         some_large_prime = 65535
+        brightness_factor = 0.8
         # saturation = 0.8 + ((angle/speed_factor % some_large_prime)/(some_large_prime - 1))*0.2
         saturation = 1
 
@@ -64,7 +65,7 @@ class PanelDriver(object):
 
             sin_baby = angle/speed_factor + magnitude**5
             hue = (math.sin(sin_baby) + math.cos(-sin_baby + magnitude))/2
-            value = math.sin(angle/speed_factor + magnitude)
+            value = math.sin(angle/speed_factor + magnitude) * brightness_factor
 
             rgb = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(hue, saturation, value))
             pixel_list.append(rgb)
