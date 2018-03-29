@@ -33,38 +33,38 @@ def interpolate_pixel(image, coordinates, interp_type=None):
 
     if interp_type == 'nearest':
         return image[
-            int(round(coordinates[1])),
-            int(round(coordinates[0]))
+            int(round(coordinates[0])),
+            int(round(coordinates[1]))
         ]
 
     coordinate_floor = (
-        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1)),
-        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1))
+        int(np.clip(floor(coordinates[1]), 0, image.shape[1] - 1)),
+        int(np.clip(floor(coordinates[0]), 0, image.shape[0] - 1))
     )
     # Otherwise bilinear
     coordinate_ceiling = (
-        int(np.clip(ceil(coordinates[0]), 0, image.shape[0] - 1)),
-        int(np.clip(ceil(coordinates[1]), 0, image.shape[1] - 1))
+        int(np.clip(ceil(coordinates[1]), 0, image.shape[1] - 1)),
+        int(np.clip(ceil(coordinates[0]), 0, image.shape[0] - 1))
     )
     coordinate_fractional = (
-        coordinates[0] - coordinate_floor[0],
-        coordinates[1] - coordinate_floor[1]
+        coordinates[1] - coordinate_floor[1],
+        coordinates[0] - coordinate_floor[0]
     )
     pixel_tl = image[
-        coordinate_floor[1],
-        coordinate_floor[0]
+        coordinate_floor[0],
+        coordinate_floor[1]
     ]
     pixel_bl = image[
-        coordinate_floor[1],
-        coordinate_ceiling[0]
+        coordinate_floor[0],
+        coordinate_ceiling[1]
     ]
     pixel_tr = image[
-        coordinate_ceiling[1],
-        coordinate_floor[0]
+        coordinate_ceiling[0],
+        coordinate_floor[1]
     ]
     pixel_br = image[
-        coordinate_ceiling[1],
         coordinate_ceiling[0],
+        coordinate_ceiling[1],
     ]
     pixel_l = blend_pixel(pixel_tl, pixel_bl, coordinate_fractional[1])
     pixel_r = blend_pixel(pixel_tr, pixel_br, coordinate_fractional[1])
@@ -81,11 +81,24 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
     """
     pixel_list = []
     for pix in pix_map_normalized:
-        pix_coordinate = (
-            np.clip(image.shape[0] * pix[0], 0, image.shape[0] - 1),
-            np.clip(image.shape[1] * pix[1], 0, image.shape[1] - 1)
-        )
-        pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
+        try:
+            min_dimension = min(image.shape[0], image.shape[1])
+            max_dimension = max(image.shape[0], image.shape[1])
+            delta_dimension = max_dimension - min_dimension
+            if image.shape[1] > image.shape[0]:
+                pix_coordinate = (
+                    np.clip(min_dimension * pix[0], 0, image.shape[0] - 1),
+                    np.clip(min_dimension * pix[1] + delta_dimension / 2, 0, image.shape[1] - 1)
+                )
+            else:
+                pix_coordinate = (
+                    np.clip(min_dimension * pix[0] + delta_dimension / 2, 0, image.shape[0] - 1),
+                    np.clip(min_dimension * pix[1], 0, image.shape[1] - 1)
+                )
+
+            pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
+        except Exception as exc:
+            import pudb; pudb.set_trace()
         if len(pixel_value) > 3:
             # BGRA fix
             pixel_value = tuple(pixel_value[:3])
