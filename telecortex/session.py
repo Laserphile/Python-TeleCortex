@@ -749,9 +749,10 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
         loops = 0
+
         while True:
             loops += 1
-            if loops > 100:
+            if loops > 1000:
                 raise UserWarning("too many retries: %s, %s" % (loops,map(str, [server_id, cmd, args, payload])) )
             try:
                 self.threads[server_id][0].put((cmd, args, payload), timeout=0.01)

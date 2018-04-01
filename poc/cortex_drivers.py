@@ -50,22 +50,22 @@ class PanelDriver(object):
 
     def calc_crazy_rainbows(self, angle, pix_map_normlized, seed):
         pixel_list = []
-        speed_factor = 100
-        brightness_factor = 0.8
+        speed_factor = 1300
+        brightness_factor = 0.3
         saturation = 1
+        hue = 10
 
         for coordinate in pix_map_normlized:
             center = (0.5, 0.5)
-            magnitude = math.sqrt(
+            magnitude = (
                 (center[0] - coordinate[0]) ** 2 +
                 (center[1] - coordinate[1]) ** 2
-            )
+            )**(1/2)
 
-            sin_baby = angle/speed_factor + magnitude**5
-            hue = (math.sin(sin_baby + seed) + math.cos(-sin_baby + magnitude))/2
-            value = math.sin(angle/speed_factor + magnitude**2) * brightness_factor
+            sin_baby = (angle+30)/speed_factor
+            hue = math.sin((sin_baby**2 + hue**2)/2 + magnitude)
+            value = math.sin((sin_baby**2 + hue**2)/2 - seed + magnitude) * brightness_factor
 
             rgb = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(hue, saturation, value))
             pixel_list.append(rgb)
-        # log_if_correct_level(logging.DEBUG, "pixel_list: %s" % pformat(pixel_list))
         return list(itertools.chain(*pixel_list))

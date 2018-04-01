@@ -133,9 +133,11 @@ def main():
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
     frameno = 0
     seed = random.random() * 50
+    start_time = time_now()
+    five_minutes = 60 * 5
     while manager:
-        frameno = frameno + 1
-        if frameno > 2 ** 16:
+        frameno += 1
+        if frameno > 2 ** 16 or (start_time - time_now() > five_minutes):
             frameno = 0
             seed = random.random()
 
