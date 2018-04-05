@@ -11,6 +11,7 @@ from datetime import datetime
 from pprint import pformat, pprint
 from copy import deepcopy
 import queue
+import json
 
 import serial
 from serial.tools import list_ports
@@ -311,7 +312,12 @@ class TelecortexSession(object):
             offset += pixels_left
 
     def chunk_payload_without_linenum(self, cmd, static_args, payload):
+        import pudb; pudb.set_trace()
         offset = 0
+        if not static_args:
+            static_args = {}
+        if not payload:
+            self.send_cmd_without_linenum(cmd, static_args)
         while payload:
             chunk_args = deepcopy(static_args)
             if offset > 0:
@@ -732,7 +738,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
     @property
     def any_alive(self):
-        return any([self.threads.get(server_id)[1] for server_id in PANELS])
+        return any([self.threads.get(server_id, (None, None))[1] for server_id in range(PANELS)])
 
     def session_active(self, server_id):
         return self.threads.get(server_id)
@@ -773,7 +779,7 @@ class TeleCortexCacheManager(TeleCortexBaseManager):
                 "%s: %s" % (
                     server_id,
                     ", ".join(map(str, [
-                        cmd, args, payload
+                        cmd, json.dumps(args), payload
                     ]))
                 ), file=cache
             )
