@@ -9,18 +9,19 @@ def watchdog(args, exception_str):
     restarts = 0
     while 1:
         print("creating process with args: %s" % args)
-    proc = subprocess.Popen(
-        args=args,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT
-    )
-    while proc.returncode is None:
-        stdout_data, _ = proc.communicate()
-        sys.stdout.write(stdout_data)
-        if stdout_data.upper().contains(exception_str.upper()):
-            print("restarting process")
-            proc.kill()
-    restarts += 1
+        print("restart number %d" % restarts )
+        proc = subprocess.Popen(
+            args=args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+        while proc.returncode is None:
+            stdout_data, _ = proc.communicate()
+            sys.stdout.write(stdout_data)
+            if stdout_data.upper().contains(exception_str.upper()):
+                print("restarting process")
+                proc.kill()
+        restarts += 1
 
 
 def main():
