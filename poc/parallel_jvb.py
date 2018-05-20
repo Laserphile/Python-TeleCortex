@@ -127,8 +127,14 @@ def direct_rainbows(pix_map, angle=0.):
 
 
 def main():
-    manager = TelecortexThreadManager(SERVERS)
+    try:
+        run_parellel()
+    except:
+        run_parellel()
 
+
+def run_parellel():
+    manager = TelecortexThreadManager(SERVERS)
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
     frameno = 0
