@@ -239,13 +239,13 @@ class TelecortexSession(object):
         self.send_cmd_obj(cmd_obj)
         if not IGNORE_ACKS:
             self.ack_queue[self.linecount] = cmd_obj
-        # logging.debug("sending cmd with lineno, %s" % repr(cmd_obj.fmt()))
+        logging.debug("sending cmd with lineno, %s" % repr(cmd_obj.fmt()))
         self.linecount += 1
 
     def send_cmd_without_linenum(self, cmd, args=None):
         cmd_obj = TelecortexCommand(cmd, args)
         self.send_cmd_obj(cmd_obj)
-        # logging.debug("sending cmd without lineno %s" % repr(cmd_obj.fmt()))
+        logging.debug("sending cmd without lineno %s" % repr(cmd_obj.fmt()))
 
     def flush_in(self):
         # wiggle DTR and CTS (only works with AVR boards)
@@ -491,7 +491,7 @@ class TelecortexSession(object):
 
         if self.line_queue:
             line = self.line_queue.popleft()
-            # logging.debug("received line: %s" % line)
+            logging.debug("received line: %s" % line)
             self.last_line = line
             return line
 
