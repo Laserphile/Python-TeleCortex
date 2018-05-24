@@ -684,7 +684,7 @@ class TeleCortexBaseManager(object):
             ))
 
         if not ports:
-            raise UserWarning("target device not found for server: %s" % server_info)
+            logging.critical("target device not found for server: %s" % server_info)
 
         return {
             'file': ports[0],
