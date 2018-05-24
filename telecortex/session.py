@@ -658,7 +658,7 @@ class TeleCortexBaseManager(object):
             for port in ports:
                 cid = None
                 if port in self.known_cids:
-                    cid = self.known_cids[cid]
+                    cid = self.known_cids[port]
                     if cid != server_info.get('cid'):
                         continue
                 else:
