@@ -1,13 +1,15 @@
 
+import argparse
 import colorsys
 import itertools
 import logging
-import multiprocessing as mp
 import math
+import multiprocessing as mp
 import os
+import time
 from collections import OrderedDict
-from time import time as time_now
 from pprint import pformat
+from time import time as time_now
 
 import serial
 
@@ -15,12 +17,13 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
-from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession, TelecortexThreadManager, SERVERS)
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
-                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping, draw_map)
+from telecortex.mapping import PIXEL_MAP_BIG as PIXEL_MAP_DOME_BIG
+from telecortex.mapping import PIXEL_MAP_SMOL as PIXEL_MAP_DOME_SMOL
+from telecortex.mapping import (draw_map, normalize_pix_map, rotate_mapping,
+                                rotate_vector, scale_mapping,
+                                transpose_mapping)
+from telecortex.session import TelecortexSession, TelecortexThreadManager
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -41,8 +44,6 @@ if os.name != 'nt':
     STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
 STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
 STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
 LOGGER.addHandler(STREAM_HANDLER)
 
 IMG_SIZE = 256
@@ -55,7 +56,7 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
-SERVERS = OrderedDict([
+SERVERS_DOME = OrderedDict([
     (0, {
         'file': '/dev/cu.usbmodem4057531',
         'baud': 57600,
@@ -83,16 +84,32 @@ SERVERS = OrderedDict([
     }),
 ])
 
-# Uncomment for Derwent config
-# SERVERS = OrderedDict([
-#     (1, {
-#         'file': '/dev/cu.usbmodem144101',
-#         'baud': 57600,
-#         'timeout': 1
-#     }),
-# ])
+SERVERS_DERWENT = OrderedDict([
+    (0, {
+        'file': '/dev/cu.usbmodem3176931',
+        'baud': 57600,
+        'timeout': 1
+    }),
+])
 
-PANELS = OrderedDict([
+MAPS_DOME = OrderedDict([
+    ('smol', normalize_pix_map(PIXEL_MAP_DOME_SMOL)),
+    ('big', normalize_pix_map(PIXEL_MAP_DOME_BIG))
+])
+
+PIXEL_MAP_GOGGLE = PIXEL_MAP_SMOL = np.array(
+    [
+        [-1, -1]
+    ] * 16 + [
+        [1, 1]
+    ] * 16
+)
+
+MAPS_DERWENT = OrderedDict([
+    ('goggle', normalize_pix_map(PIXEL_MAP_GOGGLE))
+])
+
+PANELS_DOME = OrderedDict([
     (0, [
         (0, 'big'),
         (1, 'smol'),
@@ -125,6 +142,15 @@ PANELS = OrderedDict([
     ])
 ])
 
+PANELS_DERWENT = OrderedDict([
+    (0, [
+        (0, 'goggle'),
+        # (1, 'goggle'),
+        # (2, 'goggle'),
+        # (3, 'goggle'),
+    ])
+])
+
 
 def direct_rainbows(pix_map, angle=0.):
     pixel_list = []
@@ -145,32 +171,71 @@ def direct_rainbows(pix_map, angle=0.):
 
 def main():
 
-    manager = TelecortexThreadManager(SERVERS)
+    parser = argparse.ArgumentParser(
+        description="send rainbows to several telecortex controllers in parallel",
+    )
+    parser.add_argument('--verbose', '-v', action='count', default=1)
+    parser.add_argument('--verbosity', action='store', dest='verbose', type=int)
+    parser.add_argument('--quiet', '-q', action='store_const', const=0, dest='verbose')
+    parser.add_argument('--enable-log', default=ENABLE_LOG_FILE)
+    parser.add_argument('--disable-log', action='store_false', dest='enable_log')
+    parser.add_argument('--config', choices=['derwent'] )
 
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
+
+    args = parser.parse_args()
+
+    log_level = 50 - 10 * args.verbose
+
+    STREAM_HANDLER.setLevel(log_level)
+
+    if args.enable_log:
+        LOGGER.addHandler(FILE_HANDLER)
+
+    server_config = {
+        'derwent': SERVERS_DERWENT
+    }.get(args.config, SERVERS_DOME)
+
+    map_config = {
+        'derwent': MAPS_DERWENT
+    }.get(args.config, MAPS_DOME)
+
+    panel_config = {
+        'derwent': PANELS_DERWENT
+    }.get(args.config, PANELS_DOME)
+
+    logging.debug("server_config:\n%s" % pformat(server_config))
+    logging.debug("map_config:\n%s" % pformat(map_config))
+    logging.debug("panel_config:\n%s" % pformat(panel_config))
+
+    manager = TelecortexThreadManager(server_config)
 
     start_time = time_now()
 
     while manager:
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
 
-        pixel_list_smol = direct_rainbows(
-            pix_map_normlized_smol, frameno
-        )
-        pixel_list_big = direct_rainbows(
-            pix_map_normlized_big, frameno
-        )
-        pixel_str_smol = pix_array2text(*pixel_list_smol)
-        pixel_str_big = pix_array2text(*pixel_list_big)
-        for server_id, server_panel_info in PANELS.items():
+        pixel_strs = OrderedDict()
+
+        for size, pix_map_normlized in map_config.items():
+            pixel_list = direct_rainbows(pix_map_normlized, frameno)
+            pixel_strs[size] = pix_array2text(*pixel_list)
+
+        for server_id, server_panel_info in panel_config.items():
             if not manager.threads.get(server_id):
+                logging.debug("server id %s not found in manager threads: %s" % (
+                    server_id, manager.threads.keys(),
+                ))
                 continue
             for panel_number, size in server_panel_info:
-                if size == 'big':
-                    pixel_str = pixel_str_big
-                elif size == 'smol':
-                    pixel_str = pixel_str_smol
+                assert size in pixel_strs, \
+                    "Your panel configuration specifies a size %s but your map configuration does not contain a matching entry, only %s" % (
+                        size, map_config.keys()
+                    )
+                pixel_str = pixel_strs.get(size)
+                if not pixel_str:
+                    logging.warning("empty pixel_str generated: %s" % pixel_str)
+                else:
+                    logging.debug("pixel_str: %s" % pformat(pixel_str))
 
                 manager.chunk_payload_with_linenum(
                     server_id,
@@ -179,6 +244,7 @@ def main():
 
         while not manager.all_idle:
             logging.debug("waiting on queue")
+            time.sleep(0.1)
 
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
