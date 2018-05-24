@@ -131,6 +131,12 @@ def describe_retval(retval):
         return "%s%s" % (retval, " (%s)" % errno.errorcode[retval] if retval in errno.errorcode else '')
     return "success"
 
+def text_2_bin(text):
+    return binary_type(text, ENCODING)
+
+def bin_2_text(text):
+    return text_type(text, ENCODING)
+
 def watchdog(args, exceptions, timeout=3600):
     """
     creates a subprocess using args, monitors output for exceptions (case insensitive), and restarts if found
@@ -178,7 +184,7 @@ def watchdog(args, exceptions, timeout=3600):
                 # watchdog_print("start of loop")
                 try:
                     set_nonblocking(sys.stdin)
-                    stdin_text = text_type(os.read(sys.stdin.fileno(), BUFFSIZE), ENCODING)
+                    stdin_text = bin_2_text(os.read(sys.stdin.fileno(), BUFFSIZE))
                     set_blocking(sys.stdin)
                 except (IOError, OSError):
                     stdin_text = None
@@ -189,13 +195,13 @@ def watchdog(args, exceptions, timeout=3600):
                     set_blocking(sys.stdin)
 
                 if stdin_text is not None and len(stdin_text) > 0:
-                    stdin_binary = binary_type(stdin_text, ENCODING)
+                    stdin_binary = text_2_bin(stdin_text)
                     print("SEND STDIN %s" % (repr(stdin_binary)))
-                    if binary_type('\x03', ENCODING) in stdin_binary: # ctrl-c
+                    if text_2_bin('\x03') in stdin_binary: # ctrl -c
                         watchdog_print("raising KeyboardInterrupt")
                         raise KeyboardInterrupt("received '\\x03' from stdin")
 
-                    elif binary_type('r', ENCODING) in stdin_binary: # ctrl-d
+                    elif text_2_bin('r') in stdin_binary:
                         watchdog_print("received r from stdin, restarting")
                         proc.terminate()
                     else:
@@ -203,7 +209,7 @@ def watchdog(args, exceptions, timeout=3600):
 
                 try:
                     set_nonblocking(pty_master)
-                    stdout_text = text_type(os.read(pty_master, BUFFSIZE), ENCODING)
+                    stdout_text = bin_2_text(os.read(pty_master, BUFFSIZE))
                     set_blocking(pty_master)
                 except (IOError, OSError):
                     stdout_text = None
@@ -212,19 +218,24 @@ def watchdog(args, exceptions, timeout=3600):
                     raise exc
                 if stdout_text is not None:
                     # watchdog_print("RECV STDOUT %s" % (repr(stdout_text)))
-                    # print(binary_type(stdout_text, ENCODING))
+                    # print(text_2_bin(stdout_text))
 
                     if check_out_for_exceptions(stdout_text, exceptions):
                         time.sleep(0.1)
-                        stdout_text = text_type(os.read(pty_master, BUFFSIZE), ENCODING)
+                        try:
+                            set_nonblocking(pty_master)
+                            stdout_text += bin_2_text(os.read(pty_master, BUFFSIZE))
+                            set_blocking(pty_master)
+                        except (IOError, OSError):
+                            pass
                         last_io_cycle = True
                         actually_kill_proc(proc)
 
-                    os.write(sys.stdout.fileno(), binary_type(stdout_text, ENCODING))
+                    os.write(sys.stdout.fileno(), text_2_bin(stdout_text))
 
                 try:
                     set_nonblocking(aux_master)
-                    stderr_text = text_type(os.read(aux_master, BUFFSIZE), ENCODING)
+                    stderr_text = bin_2_text(os.read(aux_master, BUFFSIZE))
                     set_blocking(aux_master)
                 except (IOError, OSError):
                     stderr_text = None
@@ -235,11 +246,17 @@ def watchdog(args, exceptions, timeout=3600):
 
                     if check_out_for_exceptions(stderr_text, exceptions):
                         time.sleep(0.1)
-                        stderr_text += text_type(os.read(aux_master, BUFFSIZE), ENCODING)
+                        try:
+                            set_nonblocking(aux_master)
+                            stderr_text += bin_2_text(os.read(aux_master, BUFFSIZE))
+                            set_blocking(aux_master)
+                        except (IOError, OSError):
+                            pass
+
                         last_io_cycle = True
                         actually_kill_proc(proc)
 
-                    os.write(sys.stdout.fileno(), binary_type(stderr_text, ENCODING))
+                    os.write(sys.stdout.fileno(), text_2_bin(stderr_text))
 
                 # watchdog_print("end of loop")
                 time.sleep(0.01)
