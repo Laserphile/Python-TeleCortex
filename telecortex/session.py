@@ -683,14 +683,17 @@ class TeleCortexBaseManager(object):
                 server_info, ports
             ))
 
-        if not ports:
-            logging.critical("target device not found for server: %s" % server_info)
-
-        return {
-            'file': ports[0],
+        response = {
             'baud': server_info.get('baud', DEFAULT_BAUD),
             'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
         }
+
+        if not ports:
+            logging.critical("target device not found for server: %s" % server_info)
+        else:
+            response['file'] = ports[0]
+
+        return response
 
     def all_idle(self):
         raise NotImplementedError()
