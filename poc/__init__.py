@@ -10,14 +10,15 @@
 - parallel_X.py : X but communication is implemented in multiple parallel threads.
 - parallel_jvb.py : The script we were running at Blazing Swan 2018
 
-# Helpers:
+## Helpers:
 
 - context.py : provides ability for poc modules to import telecortex module
 
-# Incomplete:
+## Incomplete:
 
 - async.py : An attempt at asychronous which lost out to parallel
-- parallel_transcode.py | parallel_gcode_player.py : Given a video file, convert to gcode with `transcode` so that it can be played with `gcode_player`
+- parallel_transcode.py | parallel_gcode_player.py : Given a video file,
+    convert to gcode with `transcode` so that it can be played with `gcode_player`
 - cortex_drivers.py : Something JVB was working on
 
 """
