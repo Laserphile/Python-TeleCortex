@@ -824,14 +824,16 @@ class TeleCortexCacheManager(TeleCortexBaseManager):
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
         with open(self.cache_file, 'a') as cache:
-            print(
-                "%s: %s" % (
-                    server_id,
-                    ", ".join(map(str, [
-                        cmd, json.dumps(args), payload
-                    ]))
-                ), file=cache
-            )
+            pass
+            # TODO: fix this
+            # print(
+            #     "%s: %s" % (
+            #         server_id,
+            #         ", ".join(map(str, [
+            #             cmd, json.dumps(args), payload
+            #         ]))
+            #     ), file=cache
+            # )
 
     def any_alive(self):
         return True
