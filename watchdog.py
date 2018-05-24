@@ -291,7 +291,7 @@ def watchdog(args, exceptions, timeout=3600):
 def main():
     if len(sys.argv) < 2:
         print('usage: %s script_name [script_arguments]' % sys.argv[0])
-    args = ['python'] + sys.argv[1:]
+    args = [sys.executable] + sys.argv[1:]
     watchdog(args, ['Exception', 'Traceback (most recent call last)'])
 
 
