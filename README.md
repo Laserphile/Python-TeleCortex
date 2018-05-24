@@ -4,9 +4,9 @@ A Python Client for the TeleCortex Protocol
 
 # The library
 
-- *session* used to keep track of connections to individual controllers
-- *mapping* used to create a list of pixel locations within a given image
-- *interpolation* is used to extract pixel data from an image using a pixel map.
+- __session__ used to keep track of connections to individual controllers
+- __mapping__ used to create a list of pixel locations within a given image
+- __interpolation__ is used to extract pixel data from an image using a pixel map.
 
 # Proof of Concept Scripts
 
