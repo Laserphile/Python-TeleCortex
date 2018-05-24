@@ -1,6 +1,6 @@
 # Python-TeleCortex
 
-A Python Client for the TeleCortex Protocol
+A Python Client for the [TeleCortex Protocol](https://github.com/Laserphile/TeleCortex)
 
 # The library
 
