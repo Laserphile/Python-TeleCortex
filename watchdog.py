@@ -26,6 +26,9 @@ from six import text_type, binary_type
 ENCODING = 'latin-1'
 BUFFSIZE = 2048
 
+SIGNAL_DICT = dict((k, v) for v, k in reversed(sorted(signal.__dict__.items()))
+     if v.startswith('SIG') and not v.startswith('SIG_'))
+
 def watchdog_print(thing):
     print("[watchdog] %s" % text_type(thing))
 
@@ -71,22 +74,62 @@ def pid_exists(pid):
     else:
         return True
 
-def actually_kill_proc(proc):
-    if pid_exists(proc.pid):
-        watchdog_print("terminating")
-        watchdog_print("my_pid: %s, my_pgid: %s, my_ppid: %s, proc_pid: %s proc_pgid: %s" % (
-            os.getpid(), os.getpgid(os.getpid()), os.getppid(),
-            proc.pid, os.getpgid(proc.pid)
-        ))
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+def pgid_exists(pgid):
+    if pgid < 0:
+        return False
+    if pgid == 0:
+        # According to "man 2 kill" PID 0 refers to every process
+        # in the process group of the calling process.
+        # On certain systems 0 is a valid PID but we have no way
+        # to know that in a portable fashion.
+        raise ValueError('invalid PID 0')
+    try:
+        os.killpg(pgid, 0)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH == No such process
+            return False
+        elif err.errno == errno.EPERM:
+            # EPERM clearly means there's a process to deny access to
+            return True
+        else:
+            # According to "man 2 kill" possible error values are
+            # (EINVAL, EPERM, ESRCH)
+            raise
     else:
-        raise UserWarning("tried to terminate process that is already dead")
+        return True
+
+def actually_kill_proc(proc):
+    try:
+        exc = None
+        if pid_exists(proc.pid):
+            pgid = os.getpgid(proc.pid)
+            if pgid_exists(pgid):
+                watchdog_print("terminating")
+                watchdog_print("my_pid: %s, my_pgid: %s, my_ppid: %s, proc_pid: %s proc_pgid: %s" % (
+                    os.getpid(), os.getpgid(os.getpid()), os.getppid(),
+                    proc.pid, os.getpgid(proc.pid)
+                ))
+                os.killpg(pgid, signal.SIGTERM)
+                return
+    except OSError as this_exc:
+        exc = this_exc
+    watchdog_print("tried to terminate process that is already dead: %s" % str(exc))
 
 def check_out_for_exceptions(out, exceptions):
     for exc in exceptions:
         if exc.upper() in out.upper():
             watchdog_print("found %s in output" % exc)
             return True
+
+def describe_retval(retval):
+    if retval is None:
+        return "timeout"
+    elif retval < 0:
+        return "%s%s" % (retval, " (%s)" % SIGNAL_DICT[-retval] if -retval in SIGNAL_DICT else '')
+    elif retval > 0:
+        return "%s%s" % (retval, " (%s)" % errno.errorcode[retval] if retval in errno.errorcode else '')
+    return "success"
 
 def watchdog(args, exceptions, timeout=3600):
     """
@@ -95,7 +138,9 @@ def watchdog(args, exceptions, timeout=3600):
     watchdog_print("press ctrl-c to kill process, r<enter> to restart")
 
     restarts = 0
-    while 1:
+    last_restart = False
+
+    while not last_restart:
         watchdog_print("creating process with args: %s" % args)
 
         pty_master, pty_slave = pty.openpty()
@@ -121,16 +166,15 @@ def watchdog(args, exceptions, timeout=3600):
             preexec_fn=os.setsid,
         )
 
-        set_nonblocking(aux_master)
-        set_nonblocking(pty_master)
 
         time.sleep(0.1)
 
         start = time.clock()
-        last_cycle = False
+
+        last_io_cycle = False
 
         try:
-            while proc.returncode is None and (time.clock() - start < timeout):
+            while proc.returncode is None and (time.clock() - start < timeout) and not last_io_cycle:
                 # watchdog_print("start of loop")
                 try:
                     set_nonblocking(sys.stdin)
@@ -141,6 +185,9 @@ def watchdog(args, exceptions, timeout=3600):
                 except Exception as exc:
                     watchdog_print("! READ STDIN FAILED: %s %s, " % (type(exc), exc))
                     raise exc
+                finally:
+                    set_blocking(sys.stdin)
+
                 if stdin_text is not None and len(stdin_text) > 0:
                     stdin_binary = binary_type(stdin_text, ENCODING)
                     print("SEND STDIN %s" % (repr(stdin_binary)))
@@ -155,7 +202,9 @@ def watchdog(args, exceptions, timeout=3600):
                         os.write(pty_master, stdin_binary)
 
                 try:
+                    set_nonblocking(pty_master)
                     stdout_text = text_type(os.read(pty_master, BUFFSIZE), ENCODING)
+                    set_blocking(pty_master)
                 except (IOError, OSError):
                     stdout_text = None
                 except Exception as exc:
@@ -164,41 +213,50 @@ def watchdog(args, exceptions, timeout=3600):
                 if stdout_text is not None:
                     # watchdog_print("RECV STDOUT %s" % (repr(stdout_text)))
                     # print(binary_type(stdout_text, ENCODING))
-                    os.write(sys.stdout.fileno(), binary_type(stdout_text, ENCODING))
 
                     if check_out_for_exceptions(stdout_text, exceptions):
+                        time.sleep(0.1)
+                        stdout_text = text_type(os.read(pty_master, BUFFSIZE), ENCODING)
+                        last_io_cycle = True
                         actually_kill_proc(proc)
-                        break
+
+                    os.write(sys.stdout.fileno(), binary_type(stdout_text, ENCODING))
 
                 try:
+                    set_nonblocking(aux_master)
                     stderr_text = text_type(os.read(aux_master, BUFFSIZE), ENCODING)
+                    set_blocking(aux_master)
                 except (IOError, OSError):
                     stderr_text = None
                 except Exception as exc:
                     watchdog_print("! READ STDERR FAILED: %s %s, " % (type(exc), exc))
                     raise exc
                 if stderr_text is not None:
-                    # watchdog_print("RECV STDERR %s" % (repr(stderr_text)))
-                    # print(binary_type(stderr_text, ENCODING))
-                    os.write(sys.stdout.fileno(), binary_type(stderr_text, ENCODING))
 
                     if check_out_for_exceptions(stderr_text, exceptions):
+                        time.sleep(0.1)
+                        stderr_text += text_type(os.read(aux_master, BUFFSIZE), ENCODING)
+                        last_io_cycle = True
                         actually_kill_proc(proc)
-                        break
+
+                    os.write(sys.stdout.fileno(), binary_type(stderr_text, ENCODING))
+
                 # watchdog_print("end of loop")
                 time.sleep(0.01)
                 sys.stdout.flush()
                 proc.poll()
 
         except KeyboardInterrupt:
-            last_cycle = True
+            last_restart = True
         except Exception as exc:
             watchdog_print("there was an exception in the main loop: %s %s" % (
                 type(exc), exc
             ))
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, stdin_orig_settings)
-            watchdog_print("outside of loop, proc.returncode is %s" % proc.returncode)
+            watchdog_print("outside of io loop, proc.returncode is %s - %s" % (
+                proc.returncode, describe_retval(proc.returncode)
+            ))
             if proc.returncode is None:
                 actually_kill_proc(proc)
             end = time.clock()
@@ -206,7 +264,7 @@ def watchdog(args, exceptions, timeout=3600):
                 watchdog_print("subprocess terminated immediately after multiple restarts, waiting")
                 time.sleep(1)
 
-        if last_cycle:
+        if last_restart:
             break
 
         restarts += 1
