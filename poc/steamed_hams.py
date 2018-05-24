@@ -18,35 +18,16 @@ from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
                                 normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
                                 transpose_mapping, draw_map)
+from telecortex.mapping import MAPS_DOME, transform_panel_map
 from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
-
-# STREAM_LOG_LEVEL = logging.DEBUG
-# STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
-# STREAM_LOG_LEVEL = logging.ERROR
+from telecortex.config import TeleCortexConfig
 
 IMG_SIZE = 64
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 
-LOG_FILE = ".hams.log"
-ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
-
-LOGGER = logging.getLogger()
-LOGGER.setLevel(logging.DEBUG)
-FILE_HANDLER = logging.FileHandler(LOG_FILE)
-FILE_HANDLER.setLevel(logging.DEBUG)
-STREAM_HANDLER = logging.StreamHandler()
-STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
-if os.name != 'nt':
-    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
-STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
-STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
-LOGGER.addHandler(STREAM_HANDLER)
 
 TELECORTEX_DEV = "/dev/tty.usbmodem35"
 TARGET_FRAMERATE = 20
@@ -59,7 +40,6 @@ DOT_RADIUS = 3
 # viewport definition
 MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
 
-
 def main():
     """
     Main.
@@ -69,12 +49,18 @@ def main():
     Rend some perpendicular rainbowz
     Respond to microcontroller
     """
+
+    conf = TeleCortexConfig(
+        name="hams",
+        description="take the output of the screen and draw on several telecortex controllers",
+        default_config='dome_overhead'
+    )
+
+    conf.parse_args()
+
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
     manager = TelecortexSessionManager(SERVERS)
-
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
     sct = mss()
 
@@ -107,17 +93,13 @@ def main():
                 continue
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if size == 'big':
-                        panel_map = pix_map_normlized_big
-                    elif size == 'smol':
-                        panel_map = pix_map_normlized_smol
-                    else:
-                        raise UserWarning('Panel not a know dimension')
-                    panel_map = transpose_mapping(panel_map, (-0.5, -0.5))
-                    panel_map = scale_mapping(panel_map, scale)
-                    panel_map = rotate_mapping(panel_map, angle)
-                    panel_map = transpose_mapping(panel_map, (+0.5, +0.5))
-                    panel_map = transpose_mapping(panel_map, offset)
+                    if size not in MAPS_DOME:
+                        raise UserWarning('Panel size %s not in known mappings: %s' %(
+                            size, MAPS_DOME.keys()
+                        ))
+                    panel_map = MAPS_DOME[size]
+                    panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
+
                     pixel_map_cache[(server_id, panel_number)] = panel_map
                 else:
                     panel_map = pixel_map_cache[(server_id, panel_number)]

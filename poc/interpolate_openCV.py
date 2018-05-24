@@ -19,38 +19,19 @@ from context import telecortex
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map
-from telecortex.session import (PANEL_LENGTHS, PANELS, TELECORTEX_BAUD,
-                                TELECORTEX_VID, TelecortexSession,
+from telecortex.mapping import MAPS_DOME
+from telecortex.session import (PANEL_LENGTHS, PANELS, DEFAULT_BAUD,
+                                TEENSY_VID, TelecortexSession,
                                 find_serial_dev)
 from telecortex.util import pix_array2text
+from telecortex.config import TeleCortexConfig
 
-# STREAM_LOG_LEVEL = logging.DEBUG
-# STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
-# STREAM_LOG_LEVEL = logging.ERROR
 
 IMG_SIZE = 64
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 
-LOG_FILE = ".interpolate.log"
-ENABLE_LOG_FILE = True
 ENABLE_PREVIEW = True
-
-LOGGER = logging.getLogger()
-LOGGER.setLevel(logging.DEBUG)
-FILE_HANDLER = logging.FileHandler(LOG_FILE)
-FILE_HANDLER.setLevel(logging.DEBUG)
-STREAM_HANDLER = logging.StreamHandler()
-STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
-if os.name != 'nt':
-    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
-STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
-STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
-LOGGER.addHandler(STREAM_HANDLER)
 
 TELECORTEX_DEV = "/dev/tty.usbmodem35"
 TARGET_FRAMERATE = 20
@@ -90,16 +71,26 @@ def main():
     Rend some perpendicular rainbowz
     Respond to microcontroller
     """
+    conf = TeleCortexConfig(
+        name="interpolate_opencv",
+        description="draw interpolated maps using opencv",
+        default_config='dome_overhead'
+    )
+
+    conf.parser.add_argument('--serial-dev',)
+
+    conf.parse_args()
+
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    target_device = find_serial_dev(TELECORTEX_VID)
+    target_device = conf.args.serial_dev
     if target_device is None:
-        target_device = TELECORTEX_DEV
+        target_device = find_serial_dev(TEENSY_VID)
     if not target_device:
         raise UserWarning("target device not found")
-
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
+    else:
+        logging.debug("target_device: %s" % target_device)
+        logging.debug("baud: %s" % DEFAULT_BAUD)
 
     # test_img = cv2.imread('/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg', cv2.IMREAD_COLOR)
     test_img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
@@ -116,7 +107,7 @@ def main():
 
     start_time = time_now()
     with serial.Serial(
-        port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
+        port=target_device, baudrate=DEFAULT_BAUD, timeout=1
     ) as ser:
         sesh = TelecortexSession(ser)
         sesh.reset_board()
@@ -126,10 +117,10 @@ def main():
             fill_rainbows(test_img, frameno)
 
             pixel_list_smol = interpolate_pixel_map(
-                test_img, pix_map_normlized_smol, INTERPOLATION_TYPE
+                test_img, MAPS_DOME['smol'], INTERPOLATION_TYPE
             )
             pixel_list_big = interpolate_pixel_map(
-                test_img, pix_map_normlized_big, INTERPOLATION_TYPE
+                test_img, MAPS_DOME['big'], INTERPOLATION_TYPE
             )
             pixel_str_smol = pix_array2text(*pixel_list_smol)
             pixel_str_big = pix_array2text(*pixel_list_big)
@@ -142,8 +133,8 @@ def main():
             sesh.send_cmd_with_linenum("M2610")
 
             if ENABLE_PREVIEW:
-                draw_map(test_img, pix_map_normlized_smol)
-                draw_map(test_img, pix_map_normlized_big, outline=(255, 255, 255))
+                draw_map(test_img, MAPS_DOME['smol'])
+                draw_map(test_img, MAPS_DOME['big'], outline=(255, 255, 255))
                 cv2.imshow(MAIN_WINDOW, test_img)
             if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
                 key = cv2.waitKey(2) & 0xFF

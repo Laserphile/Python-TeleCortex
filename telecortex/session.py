@@ -27,19 +27,17 @@ import multiprocessing as mp
 # pip install pyserial
 # python -m serial.tools.list_ports --verbose
 
-DEFAULT_BAUDRATE = 1000000
+DEFAULT_BAUD = 57600
 DEFAULT_TIMEOUT = 1
 
 # Fix for this issue:
 IGNORE_SERIAL_NO = True
 IGNORE_VID_PID = False
 
-TELECORTEX_VID = 0x16C0
-TELECORTEX_BAUD = 57600
+TEENSY_VID = 0x16C0
 PANEL_LENGTHS = [
     316, 260, 260, 260
 ]
-PANELS = len(PANEL_LENGTHS)
 
 IGNORE_ACKS = False
 
@@ -207,6 +205,30 @@ class TelecortexSession(object):
 
     @property
     def lines_avail(self):
+        # TODO: something seems to crash this all the time:
+        """
+        Traceback (most recent call last):
+          File "poc/rainbows.py", line 69, in main
+            sesh.send_cmd_without_linenum("M2603", {"Q":panel, "V":pixel_str})
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 246, in send_cmd_without_linenum
+            self.send_cmd_obj(cmd_obj)
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 229, in send_cmd_obj
+            self.parse_responses()
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 553, in parse_responses
+            self.parse_response(line)
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 537, in parse_response
+            self.handle_resend(**match)
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 442, in handle_resend
+            resend_command.args
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 238, in send_cmd_with_linenum
+            self.send_cmd_obj(cmd_obj)
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 228, in send_cmd_obj
+            while self.lines_avail or self.bytes_left < len(full_cmd):
+          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 208, in lines_avail
+            return self.ser.in_waiting
+          File "/Users/derwent/.pyenv/versions/3.6.2/lib/python3.6/site-packages/serial/serialpos[watchdog] outside of io loop, proc.returncode is -15 - -15 (SIGTERM)
+        """
+
         return self.ser.in_waiting
 
     @classmethod
@@ -214,7 +236,7 @@ class TelecortexSession(object):
         # TODO: I don't think this works because of garbage collection?
         ser = serial.Serial(
             port=serial_conf.get('port'),
-            baudrate=serial_conf.get('baud', DEFAULT_BAUDRATE),
+            baudrate=serial_conf.get('baud', DEFAULT_BAUD),
             timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
         )
         return cls(ser, linenum)
@@ -608,7 +630,7 @@ class TeleCortexBaseManager(object):
         if 'file' in server_info:
             return {
                 'file': server_info.get('file'),
-                'baud': server_info.get('baud', DEFAULT_BAUDRATE),
+                'baud': server_info.get('baud', DEFAULT_BAUD),
                 'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
             }
 
@@ -642,7 +664,7 @@ class TeleCortexBaseManager(object):
                 else:
                     ser = serial.Serial(
                         port=port,
-                        baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
+                        baudrate=server_info.get('baud', DEFAULT_BAUD),
                         timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
                     )
                     sesh = TelecortexSession(ser)
@@ -666,7 +688,7 @@ class TeleCortexBaseManager(object):
 
         return {
             'file': ports[0],
-            'baud': server_info.get('baud', DEFAULT_BAUDRATE),
+            'baud': server_info.get('baud', DEFAULT_BAUD),
             'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
         }
 
@@ -786,7 +808,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
     @property
     def any_alive(self):
-        return any([self.threads.get(server_id, (None, None))[1] for server_id in range(PANELS)])
+        return any([self.threads.get(server_id, (None, None))[1] for server_id in self.servers.keys()])
 
     def session_active(self, server_id):
         return self.threads.get(server_id)
@@ -844,69 +866,58 @@ class TeleCortexCacheManager(TeleCortexBaseManager):
     def session_active(self, server_id):
         return True
 
-SERVERS = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057530', 'baud':57600, 'cid':1}),
-    (1, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058601', 'baud':57600, 'cid':2}),
-    (2, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'3176950', 'baud':57600, 'cid':3}),
-    (3, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4057540', 'baud':57600, 'cid':4}),
-    (4, {'vid': 0x16C0, 'pid': 0x0483, 'ser':'4058621', 'baud':57600, 'cid':5})
+SERVERS_DOME = OrderedDict([
+    (0, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4057530', 'baud':DEFAULT_BAUD, 'cid':1}),
+    (1, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4058600', 'baud':DEFAULT_BAUD, 'cid':2}),
+    (2, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'3176950', 'baud':DEFAULT_BAUD, 'cid':3}),
+    (3, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4057540', 'baud':DEFAULT_BAUD, 'cid':4}),
+    (4, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4058621', 'baud':DEFAULT_BAUD, 'cid':5})
 ])
 
 # SERVERS = OrderedDict([
-#    (0, {'vid': 0x16C0, 'pid': 0x0483})
+#    (0, {'vid': TEENSY_VID, 'pid': 0x0483})
 # ])
 
-SERVERS_DOME = OrderedDict([
-    (0, {
-        'file': '/dev/cu.usbmodem4057531',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (1, {
-        'file': '/dev/cu.usbmodem4058621',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (2, {
-        'file': '/dev/cu.usbmodem3176951',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (3, {
-        'file': '/dev/cu.usbmodem4057541',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (4, {
-        'file': '/dev/cu.usbmodem4058601',
-        'baud': 57600,
-        'timeout': 1
-    }),
-])
+# SERVERS_DOME = OrderedDict([
+#     (0, {
+#         'file': '/dev/cu.usbmodem4057531',
+#         'baud': DEFAULT_BAUD,
+#         'timeout': DEFAULT_TIMEOUT
+#     }),
+#     (1, {
+#         'file': '/dev/cu.usbmodem4058621',
+#         'baud': DEFAULT_BAUD,
+#         'timeout': DEFAULT_TIMEOUT
+#     }),
+#     (2, {
+#         'file': '/dev/cu.usbmodem3176951',
+#         'baud': DEFAULT_BAUD,
+#         'timeout': DEFAULT_TIMEOUT
+#     }),
+#     (3, {
+#         'file': '/dev/cu.usbmodem4057541',
+#         'baud': DEFAULT_BAUD,
+#         'timeout': DEFAULT_TIMEOUT
+#     }),
+#     (4, {
+#         'file': '/dev/cu.usbmodem4058601',
+#         'baud': DEFAULT_BAUD,
+#         'timeout': DEFAULT_TIMEOUT
+#     }),
+# ])
 
 SERVERS_SINGLE = OrderedDict([
-    (0, {'vid': 0x16C0, 'pid': 0x0483, 'baud': 57600, 'timeout': 1})
+    (0, {'vid': TEENSY_VID, 'pid': 0x0483, 'baud': DEFAULT_BAUD, 'timeout': DEFAULT_TIMEOUT})
     # (0, {
     #     'file': '/dev/cu.usbmodem3176931',
-    #     'baud': 57600,
-    #     'timeout': 1
+    #     'baud': DEFAULT_BAUD,
+    #     'timeout': DEFAULT_TIMEOUT
     # }),
 ])
 
 SERVERS_BLANK = OrderedDict([
 
 ])
-
-def main():
-    manager = TelecortexSessionManager(SERVERS)
-    while manager:
-        for sesh in manager.sessions.values():
-            for panel_number, _ in enumerate(PANEL_LENGTHS):
-                sesh.send_cmd_with_linenum(
-                    "M2602",
-                    {"Q": panel_number, "V": "////"}
-                )
-            sesh.send_cmd_with_linenum("M2610")
 
 
 if __name__ == '__main__':

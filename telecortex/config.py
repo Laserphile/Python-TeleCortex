@@ -5,8 +5,8 @@ import re
 from pprint import pformat, pprint
 
 import coloredlogs
-from telecortex.mapping import MAPS_DOME, MAPS_DOME_SIMPLIFIED, MAPS_GOGGLE
-from telecortex.mapping import PANELS_DOME_SIMPLIFIED, PANELS_DOME_MAPPED_OVERHEAD, PANELS_GOGGLE
+from telecortex.mapping import MAPS_DOME_OVERHEAD, MAPS_DOME_DJ, MAPS_DOME_SIMPLIFIED, MAPS_GOGGLE
+from telecortex.mapping import PANELS_DOME_SIMPLIFIED, PANELS_DOME_OVERHEAD, PANELS_DOME_DJ, PANELS_GOGGLE
 from telecortex.session import SERVERS_DOME, SERVERS_SINGLE
 
 
@@ -18,8 +18,8 @@ class TeleCortexConfig(object):
         self.parser.add_argument('--verbose', '-v', action='count', default=1)
         self.parser.add_argument('--verbosity', action='store', dest='verbose', type=int)
         self.parser.add_argument('--quiet', '-q', action='store_const', const=0, dest='verbose')
-        self.parser.add_argument('--enable-log', default=True)
-        self.parser.add_argument('--disable-log', action='store_false', dest='enable_log')
+        self.parser.add_argument('--enable-log-file', default=False)
+        # self.parser.add_argument('--disable-log-file', action='store_false', dest='enable_log_file')
         self.parser.add_argument(
             '--config',
             choices=['dome', 'dome_simplified', 'single', 'goggles'],
@@ -51,21 +51,24 @@ class TeleCortexConfig(object):
         self.setup_logger()
 
         self.servers = {
-            'dome': SERVERS_DOME,
+            'dome_overhead': SERVERS_DOME,
+            'dome_dj': SERVERS_DOME,
             'dome_simplified': SERVERS_DOME,
             'single': SERVERS_SINGLE,
             'goggles': SERVERS_SINGLE,
         }.get(self.args.config, SERVERS_SINGLE)
 
         self.maps = {
-            'dome': MAPS_DOME,
+            'dome_overhead': MAPS_DOME_OVERHEAD,
+            'dome_dj': MAPS_DOME_DJ,
             'dome_simplified': MAPS_DOME_SIMPLIFIED,
             'single': MAPS_DOME_SIMPLIFIED,
             'goggles': MAPS_GOGGLE,
         }.get(self.args.config, MAPS_DOME_SIMPLIFIED)
 
         self.panels = {
-            'dome': PANELS_DOME_MAPPED_OVERHEAD,
+            'dome_overhead': PANELS_DOME_OVERHEAD,
+            'dome_dj': PANELS_DOME_DJ,
             'dome_simplified': PANELS_DOME_SIMPLIFIED,
             'single': PANELS_DOME_SIMPLIFIED,
             'goggles': PANELS_GOGGLE
@@ -80,7 +83,7 @@ class TeleCortexConfig(object):
         self.logger.setLevel(logging.DEBUG)
         self.file_handler = logging.FileHandler(self.log_file)
         self.file_handler.setLevel(logging.DEBUG)
-        if self.args.enable_log:
+        if self.args.enable_log_file:
             self.logger.addHandler(self.file_handler)
         self.stream_handler = logging.StreamHandler()
         self.stream_handler.setLevel(self.log_level)

@@ -19,10 +19,12 @@ import numpy as np
 from context import telecortex
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
-from telecortex.session import (PANEL_LENGTHS, PANELS, TELECORTEX_BAUD,
-                                TELECORTEX_VID, find_serial_dev, TelecortexSession)
+from telecortex.session import (PANEL_LENGTHS, PANELS, DEFAULT_BAUD,
+                                TEENSY_VID, find_serial_dev, TelecortexSession)
 from telecortex.util import pix_array2text
-from telecortex.mapping import (PIXEL_MAP_SMOL, PIXEL_MAP_BIG, normalize_pix_map)
+from telecortex.mapping import MAPS_DOME
+from telecortex.config import TeleCortexConfig
+
 
 # STREAM_LOG_LEVEL = logging.INFO
 STREAM_LOG_LEVEL = logging.WARN
@@ -170,16 +172,29 @@ def main():
     Rend some perpendicular rainbowz
     Respond to microcontroller
     """
+
+    conf = TeleCortexConfig(
+        name="rainbowz",
+        description="send rainbows to a single telecortex controller as fast as possible",
+        default_config='single'
+    )
+    conf.parser.add_argument('--serial-dev',)
+
+    conf.parse_args()
+
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    target_device = find_serial_dev(TELECORTEX_VID)
+    target_device = conf.args.serial_dev
     if target_device is None:
-        target_device = TELECORTEX_DEV
+        target_device = find_serial_dev(TEENSY_VID)
     if not target_device:
         raise UserWarning("target device not found")
+    else:
+        logging.debug("target_device: %s" % target_device)
+        logging.debug("baud: %s" % DEFAULT_BAUD)
 
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
+    pix_map_normlized_smol = MAPS_DOME['smol']
+    pix_map_normlized_big = MAPS_DOME['big']
 
     test_img = Image.new('RGB', (IMG_SIZE, IMG_SIZE))
 
@@ -191,7 +206,7 @@ def main():
 
     start_time = time_now()
     with serial.Serial(
-            port=target_device, baudrate=TELECORTEX_BAUD, timeout=1
+            port=target_device, baudrate=DEFAULT_BAUD, timeout=1
     ) as ser:
         sesh = TelecortexSession(ser)
         sesh.reset_board()

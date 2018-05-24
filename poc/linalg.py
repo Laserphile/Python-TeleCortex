@@ -17,34 +17,17 @@ import cv2
 import numpy as np
 from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
                                 normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
                                 transpose_mapping, draw_map)
+from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
+from telecortex.mapping import MAPS_DOME, transform_panel_map
 from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
+from telecortex.config import TeleCortexConfig
 
-# STREAM_LOG_LEVEL = logging.DEBUG
-# STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
-# STREAM_LOG_LEVEL = logging.ERROR
-
-LOG_FILE = ".linalg.log"
 ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
-
-LOGGER = logging.getLogger()
-LOGGER.setLevel(logging.DEBUG)
-FILE_HANDLER = logging.FileHandler(LOG_FILE)
-FILE_HANDLER.setLevel(logging.DEBUG)
-STREAM_HANDLER = logging.StreamHandler()
-STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
-if os.name != 'nt':
-    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
-STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
-STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
-LOGGER.addHandler(STREAM_HANDLER)
 
 IMG_SIZE = 256
 MAX_HUE = 1.0
@@ -65,12 +48,15 @@ def fill_rainbows(image, angle=0.0):
     return image
 
 def main():
+    conf = TeleCortexConfig(
+        name="linalg",
+        description="draw a single rainbow spanning several telecortex controllers",
+        default_config='dome_overhead'
+    )
+
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    manager = TelecortexSessionManager(SERVERS)
-
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
+    manager = TelecortexSessionManager(conf.servers)
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
@@ -99,21 +85,18 @@ def main():
                 continue
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if size == 'big':
-                        map = pix_map_normlized_big
-                    elif size == 'smol':
-                        map = pix_map_normlized_smol
-                    map = transpose_mapping(map, (-0.5, -0.5))
-                    map = scale_mapping(map, scale)
-                    map = rotate_mapping(map, angle)
-                    map = transpose_mapping(map, (+0.5, +0.5))
-                    map = transpose_mapping(map, offset)
-                    pixel_map_cache[(server_id, panel_number)] = map
+                    if size not in MAPS_DOME:
+                        raise UserWarning('Panel size %s not in known mappings: %s' %(
+                            size, MAPS_DOME.keys()
+                        ))
+                    panel_map = MAPS_DOME[size]
+                    panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
+                    pixel_map_cache[(server_id, panel_number)] = panel_map
                 else:
-                    map = pixel_map_cache[(server_id, panel_number)]
+                    panel_map = pixel_map_cache[(server_id, panel_number)]
 
                 pixel_list = interpolate_pixel_map(
-                    img, map, INTERPOLATION_TYPE
+                    img, panel_map, INTERPOLATION_TYPE
                 )
                 pixel_str = pix_array2text(*pixel_list)
 

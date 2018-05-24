@@ -282,6 +282,21 @@ def normalize_pix_map(pix_map):
 
     return normalized
 
+MAPS_DOME_SIMPLIFIED = OrderedDict([
+    ('smol', normalize_pix_map(PIXEL_MAP_DOME_SMOL)),
+    ('big', normalize_pix_map(PIXEL_MAP_DOME_BIG)),
+])
+
+MAPS_DOME = OrderedDict([
+    ('smol', normalize_pix_map(PIXEL_MAP_DOME_SMOL)),
+    ('big', normalize_pix_map(PIXEL_MAP_DOME_BIG)),
+    ('outer', normalize_pix_map(PIXEL_MAP_DOME_OUTER)),
+    ('outer_flip', normalize_pix_map(PIXEL_MAP_DOME_OUTER_FLIP))
+])
+
+MAPS_GOGGLE = OrderedDict([
+    ('goggle', normalize_pix_map(PIXEL_MAP_GOGGLE))
+])
 
 def mat_rotation_2d(angle):
     """
@@ -355,7 +370,7 @@ CTRL_4_ROT = (4 * 360 / 5)
 CTRL_5_ROT = (0 * 360 / 5)
 
 
-PANELS = OrderedDict([
+GENERATOR_DOME_OVERHEAD = OrderedDict([
     (0, [
         (0, 'big', PANEL_0_SKEW, CTRL_1_ROT, rotate_vector(PANEL_0_OFFSET, CTRL_1_ROT)),
         (1, 'smol', PANEL_1_SKEW, CTRL_1_ROT, rotate_vector(PANEL_1_OFFSET, CTRL_1_ROT)),
@@ -387,7 +402,10 @@ PANELS = OrderedDict([
         (3, 'outer_flip', PANEL_3_SKEW, (CTRL_5_ROT + CTRL_1_ROT), rotate_vector(PANEL_3_OFFSET, (CTRL_5_ROT + CTRL_1_ROT))),
     ])
 ])
-PANELS_DOME_MAPPED_OVERHEAD = PANELS
+
+GENERATOR_DOME_DJ = OrderedDict([
+    # To do
+])
 
 PANELS_DOME_SIMPLIFIED = OrderedDict([
     (0, [
@@ -428,21 +446,36 @@ PANELS_GOGGLE = OrderedDict([
     ])
 ])
 
-MAPS_DOME_SIMPLIFIED = OrderedDict([
-    ('smol', normalize_pix_map(PIXEL_MAP_DOME_SMOL)),
-    ('big', normalize_pix_map(PIXEL_MAP_DOME_BIG)),
-])
+def transform_panel_map(panel_map, size, scale, angle, offset):
+    panel_map = transpose_mapping(panel_map, (-0.5, -0.5))
+    panel_map = scale_mapping(panel_map, scale)
+    panel_map = rotate_mapping(panel_map, angle)
+    panel_map = transpose_mapping(panel_map, (+0.5, +0.5))
+    panel_map = transpose_mapping(panel_map, offset)
+    return panel_map
 
-MAPS_DOME = OrderedDict([
-    ('smol', normalize_pix_map(PIXEL_MAP_DOME_SMOL)),
-    ('big', normalize_pix_map(PIXEL_MAP_DOME_BIG)),
-    ('outer', normalize_pix_map(PIXEL_MAP_DOME_OUTER)),
-    ('outer_flip', normalize_pix_map(PIXEL_MAP_DOME_OUTER_FLIP))
-])
 
-MAPS_GOGGLE = OrderedDict([
-    ('goggle', normalize_pix_map(PIXEL_MAP_GOGGLE))
-])
+def generate_panel_maps(generator):
+    maps = OrderedDict()
+    panels = OrderedDict()
+    for server_id, server_panel_info in generator.items():
+        panels[server_id] = []
+        maps[server_id] = []
+        for panel_number, size, scale, angle, offset in server_panel_info:
+            map_name = "%s-%d-%d" % (size, server_id, panel_number)
+            if size not in MAPS_DOME:
+                raise UserWarning('Panel size %s not in known mappings: %s' %(
+                    size, MAPS_DOME.keys()
+                ))
+            panel_map = MAPS_DOME[size]
+            panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
+
+            panels[server_id].append((panel_number, map_name))
+            maps[map_name] = panel_map
+    return maps, panels
+
+MAPS_DOME_OVERHEAD, PANELS_DOME_OVERHEAD = generate_panel_maps(GENERATOR_DOME_OVERHEAD)
+MAPS_DOME_DJ, PANELS_DOME_DJ = generate_panel_maps(GENERATOR_DOME_DJ)
 
 def draw_map(image, pix_map_normlized, radius=1, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""

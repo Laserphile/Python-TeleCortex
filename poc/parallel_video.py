@@ -21,35 +21,16 @@ from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PI
                                 draw_map, normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
-from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
+from telecortex.session import (DEFAULT_BAUD, DEFAULT_TIMEOUT,
                                 PANEL_LENGTHS, TelecortexSession,
                                 TelecortexSessionManager,
                                 TelecortexThreadManager)
 from telecortex.session import SERVERS_DOME as SERVERS
 from telecortex.util import pix_array2text
+from telecortex.mapping import MAPS_DOME, transform_panel_map
+from telecortex.config import TeleCortexConfig
 
-# STREAM_LOG_LEVEL = logging.DEBUG
-# STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
-# STREAM_LOG_LEVEL = logging.ERROR
-
-LOG_FILE = ".parallel.log"
-ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
-
-LOGGER = logging.getLogger()
-LOGGER.setLevel(logging.DEBUG)
-FILE_HANDLER = logging.FileHandler(LOG_FILE)
-FILE_HANDLER.setLevel(logging.DEBUG)
-STREAM_HANDLER = logging.StreamHandler()
-STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
-if os.name != 'nt':
-    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
-STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
-STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
-LOGGER.addHandler(STREAM_HANDLER)
 
 IMG_SIZE = 128
 MAX_HUE = 1.0
@@ -65,12 +46,15 @@ VIDEO_FILE = "/Users/derwent/Movies/dome animations/BOKK (loop).mov"
 
 def main():
 
-    manager = TelecortexThreadManager(SERVERS)
+    conf = TeleCortexConfig(
+        name="parallel_video",
+        description="draw a video file spanning several telecortex controllers in parallel",
+        default_config='dome_overhead'
+    )
 
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
-    pix_map_normlized_outer = normalize_pix_map(PIXEL_MAP_OUTER)
-    pix_map_normlized_outer_flip = normalize_pix_map(PIXEL_MAP_OUTER_FLIP)
+    conf.parse_args()
+
+    manager = TelecortexThreadManager(conf.servers)
 
     cap = cv2.VideoCapture(VIDEO_FILE)
     ret, img = cap.read()
@@ -100,21 +84,13 @@ def main():
                 continue
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if size == 'big':
-                        panel_map = pix_map_normlized_big
-                    elif size == 'smol':
-                        panel_map = pix_map_normlized_smol
-                    elif size == 'outer':
-                        panel_map = pix_map_normlized_outer
-                    elif size == 'outer_flip':
-                        panel_map = pix_map_normlized_outer_flip
-                    else:
-                        raise UserWarning('Panel not a know dimension')
-                    panel_map = transpose_mapping(panel_map, (-0.5, -0.5))
-                    panel_map = scale_mapping(panel_map, scale)
-                    panel_map = rotate_mapping(panel_map, angle)
-                    panel_map = transpose_mapping(panel_map, (+0.5, +0.5))
-                    panel_map = transpose_mapping(panel_map, offset)
+                    if size not in MAPS_DOME:
+                        raise UserWarning('Panel size %s not in known mappings: %s' %(
+                            size, MAPS_DOME.keys()
+                        ))
+                    panel_map = MAPS_DOME[size]
+                    panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
+
                     pixel_map_cache[(server_id, panel_number)] = panel_map
 
                 if INTERLEAVE:

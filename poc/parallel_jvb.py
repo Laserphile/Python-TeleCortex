@@ -44,8 +44,8 @@ def direct_rainbows(pix_map, angle=0.):
 
 def main():
     conf = TeleCortexConfig(
-        name="parallel",
-        description="send rainbows to several telecortex controllers in parallel",
+        name="parallel_jvb",
+        description="send fucked up rainbow circles to several telecortex controllers in parallel",
         default_config='dome_simplified'
     )
 
@@ -67,8 +67,6 @@ def main():
         if frameno > 2 ** 16 or (start_time - time_now() > five_minutes):
             frameno = 0
             seed = random.random()
-
-
 
         driver = PanelDriver(pix_map_normlized_smol, pix_map_normlized_big, IMG_SIZE, MAX_HUE, MAX_ANGLE)
 
