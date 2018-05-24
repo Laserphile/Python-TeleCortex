@@ -4,9 +4,9 @@ A Python Client for the TeleCortex Protocol
 
 # The library
 
-    - `session` used to keep track of
-    - `mapping` used to create a list of pixel locations within a given image
-    - `interpolation` is used to extract pixel data from an image using a pixel map.
+- `session` used to keep track of
+- `mapping` used to create a list of pixel locations within a given image
+- `interpolation` is used to extract pixel data from an image using a pixel map.
 
 # Proof of Concept Scripts
 
@@ -37,7 +37,7 @@ and can sometimes bet set to `None` inexplicably.
 The file name can randomly disappear while the device is being used,
 and then reappear under a different name which was a nightmare to debug.
 This is why in our implementation, we used an EEPROM coded device ID to get around this.
-We also suggest using watchdog.py to run the scripts so that your script can be restarted automatically
+We also suggest using `watchdog.py` to run the scripts so that your script can be restarted automatically
 
 ## Debugging
 
