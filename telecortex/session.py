@@ -10,7 +10,7 @@ from collections import OrderedDict, deque
 from datetime import datetime
 from pprint import pformat, pprint
 from copy import deepcopy
-import queue
+# import queue
 import json
 
 import serial
