@@ -7,25 +7,19 @@ import os
 from collections import OrderedDict
 from time import time as time_now
 
-
 import serial
 
 import coloredlogs
 import cv2
 import numpy as np
-from mss import mss
 from context import telecortex
-from telecortex.session import (DEFAULT_BAUD, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession, TelecortexThreadManager)
-from telecortex.session import SERVERS_DOME as SERVERS
-from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER,
-                                draw_map, normalize_pix_map, rotate_mapping,
-                                rotate_vector, scale_mapping,
-                                transpose_mapping)
-from telecortex.mapping import MAPS_DOME, transform_panel_map
-from telecortex.util import pix_array2text
+from mss import mss
 from telecortex.config import TeleCortexConfig
+from telecortex.interpolation import interpolate_pixel_map
+from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
+from telecortex.mapping import MAPS_DOME, draw_map, transform_panel_map
+from telecortex.session import TelecortexThreadManager
+from telecortex.util import pix_array2text
 
 ENABLE_PREVIEW = True
 
