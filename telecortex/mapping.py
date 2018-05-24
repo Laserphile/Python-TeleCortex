@@ -242,6 +242,10 @@ PIXEL_MAP_OUTER_FLIP = np.array([
 
 def normalize_pix_map(pix_map):
     """Return a normalized copy of `pixel map` all x, y between 0, 1."""
+    assert isinstance(pix_map, np.ndarray), \
+        "pix_map should be a numpy ndarray, not %s" % type(pix_map)
+    assert pix_map.shape[1] == 2, \
+        "pix map should be an array of 2d coordinates, not shape: %s" % (pix_map.shape, )
     normalized = pix_map.astype(np.float64)
 
     pix_min_x = normalized.min(0)[0]
