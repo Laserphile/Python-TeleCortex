@@ -690,6 +690,7 @@ class TeleCortexBaseManager(object):
 
         if not ports:
             logging.critical("target device not found for server: %s" % server_info)
+            return {}
         else:
             response['file'] = ports[0]
 
@@ -731,15 +732,16 @@ class TelecortexSessionManager(TeleCortexBaseManager):
             # if session does not exist, create a new one
             serial_conf = self.get_serial_conf(server_info)
 
-            ser = serial.Serial(
-                port=serial_conf['file'],
-                baudrate=serial_conf['baud'],
-                timeout=serial_conf['timeout'],
-            )
-            sesh = TelecortexSession(ser)
-            sesh.reset_board()
-            logging.warning("added session for server: %s" % server_info)
-            self.sessions[server_id] = sesh
+            if serial_conf:
+                ser = serial.Serial(
+                    port=serial_conf['file'],
+                    baudrate=serial_conf['baud'],
+                    timeout=serial_conf['timeout'],
+                )
+                sesh = TelecortexSession(ser)
+                sesh.reset_board()
+                logging.warning("added session for server: %s" % server_info)
+                self.sessions[server_id] = sesh
 
 
     def close(self):
@@ -799,15 +801,16 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             server_info = self.servers.get(server_id, {})
             serial_conf = self.get_serial_conf(server_info)
 
-            queue = mp.Queue(10)
+            if serial_conf:
+                queue = mp.Queue(10)
 
-            proc = ctx.Process(
-                target=self.controller_thread,
-                args=(serial_conf, queue),
-                name="controller_%s" % server_id
-            )
-            proc.start()
-            self.threads[server_id] = (queue, proc)
+                proc = ctx.Process(
+                    target=self.controller_thread,
+                    args=(serial_conf, queue),
+                    name="controller_%s" % server_id
+                )
+                proc.start()
+                self.threads[server_id] = (queue, proc)
 
     @property
     def any_alive(self):
