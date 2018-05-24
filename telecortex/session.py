@@ -32,6 +32,7 @@ DEFAULT_TIMEOUT = 1
 
 # Fix for this issue:
 IGNORE_SERIAL_NO = True
+IGNORE_VID_PID = False
 
 TELECORTEX_VID = 0x16C0
 TELECORTEX_BAUD = 57600
@@ -600,6 +601,74 @@ servers is a list of objects containing information about a server's configurati
 class TeleCortexBaseManager(object):
     def __init__(self, servers):
         self.servers = servers
+        self.known_cids = OrderedDict()
+
+    def get_serial_conf(self, server_info):
+
+        if 'file' in server_info:
+            return {
+                'file': server_info.get('file'),
+                'baud': server_info.get('baud', DEFAULT_BAUDRATE),
+                'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
+            }
+
+        dev_kwargs = {}
+        for key in ['vid', 'pid', 'ser', 'dev']:
+            if key in server_info:
+                dev_kwargs[key] = server_info[key]
+
+        if IGNORE_SERIAL_NO:
+            if 'ser' in dev_kwargs:
+                del dev_kwargs['ser']
+        if IGNORE_VID_PID:
+            if 'vid' in dev_kwargs:
+                del dev_kwargs['vid']
+            if 'pid' in dev_kwargs:
+                del dev_kwargs['pid']
+
+
+        ports = query_serial_dev(**dev_kwargs)
+
+
+        if 'cid' in server_info:
+            ports_matching_cid = []
+
+            for port in ports:
+                cid = None
+                if port in self.known_cids:
+                    cid = self.known_cids[cid]
+                    if cid != server_info.get('cid'):
+                        continue
+                else:
+                    ser = serial.Serial(
+                        port=port,
+                        baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
+                        timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
+                    )
+                    sesh = TelecortexSession(ser)
+                    sesh.reset_board()
+                    if server_info.get('cid') is not None:
+                        cid = int(sesh.get_cid())
+                        self.known_cids[port] = cid
+                        if cid != server_info.get('cid'):
+                            ser.close()
+                            continue
+                ports_matching_cid.append(port)
+            ports = ports_matching_cid
+
+        if len(ports) > 1:
+            logging.warning("ambiguous server info matches multiple ports: %s | %s" % (
+                server_info, ports
+            ))
+
+        if not ports:
+            raise UserWarning("target device not found for server: %s" % server_info)
+
+        return {
+            'file': ports[0],
+            'baud': server_info.get('baud', DEFAULT_BAUDRATE),
+            'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
+        }
 
     def all_idle(self):
         raise NotImplementedError()
@@ -635,40 +704,18 @@ class TelecortexSessionManager(TeleCortexBaseManager):
                 continue
 
             # if session does not exist, create a new one
-            dev_kwargs = {}
-            for key in ['vid', 'pid', 'ser', 'dev']:
-                if key in server_info:
-                    dev_kwargs[key] = server_info[key]
+            serial_conf = self.get_serial_conf(server_info)
 
-            if IGNORE_SERIAL_NO:
-                if 'ser' in dev_kwargs:
-                    del dev_kwargs['ser']
-                if 'vid' in dev_kwargs:
-                    del dev_kwargs['vid']
-                if 'pid' in dev_kwargs:
-                    del dev_kwargs['pid']
+            ser = serial.Serial(
+                port=serial_conf['file'],
+                baudrate=serial_conf['baud'],
+                timeout=serial_conf['timeout'],
+            )
+            sesh = TelecortexSession(ser)
+            sesh.reset_board()
+            logging.warning("added session for server: %s" % server_info)
+            self.sessions[server_id] = sesh
 
-
-            ports = query_serial_dev(**dev_kwargs)
-            if not ports:
-                raise UserWarning("target device not found for server: %s" % server_info)
-
-            for port in ports:
-                ser = serial.Serial(
-                    port=port,
-                    baudrate=server_info.get('baud', DEFAULT_BAUDRATE),
-                    timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
-                )
-                sesh = TelecortexSession(ser)
-                sesh.reset_board()
-                if server_info.get('cid') is not None:
-                    cid = int(sesh.get_cid())
-                    if cid != server_info.get('cid'):
-                        ser.close()
-                        continue
-                # if doesn't match controller id then close port and skip
-                logging.warning("added session for server: %s" % server_info)
-                self.sessions[server_id] = sesh
 
     def close(self):
         for server_id, session in self.sessions.items():
@@ -724,7 +771,8 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             if server_info[1]:
                 server_info[1].terminate()
 
-            serial_conf = self.servers.get(server_id, {})
+            server_info = self.servers.get(server_id, {})
+            serial_conf = self.get_serial_conf(server_info)
 
             queue = mp.Queue(10)
 
@@ -805,6 +853,47 @@ SERVERS = OrderedDict([
 # SERVERS = OrderedDict([
 #    (0, {'vid': 0x16C0, 'pid': 0x0483})
 # ])
+
+SERVERS_DOME = OrderedDict([
+    (0, {
+        'file': '/dev/cu.usbmodem4057531',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (1, {
+        'file': '/dev/cu.usbmodem4058621',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (2, {
+        'file': '/dev/cu.usbmodem3176951',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (3, {
+        'file': '/dev/cu.usbmodem4057541',
+        'baud': 57600,
+        'timeout': 1
+    }),
+    (4, {
+        'file': '/dev/cu.usbmodem4058601',
+        'baud': 57600,
+        'timeout': 1
+    }),
+])
+
+SERVERS_SINGLE = OrderedDict([
+    (0, {'vid': 0x16C0, 'pid': 0x0483, 'baud': 57600, 'timeout': 1})
+    # (0, {
+    #     'file': '/dev/cu.usbmodem3176931',
+    #     'baud': 57600,
+    #     'timeout': 1
+    # }),
+])
+
+SERVERS_BLANK = OrderedDict([
+
+])
 
 def main():
     manager = TelecortexSessionManager(SERVERS)

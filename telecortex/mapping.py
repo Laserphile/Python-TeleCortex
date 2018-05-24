@@ -61,6 +61,7 @@ PIXEL_MAP_SMOL = np.array([
     [1352, 1266], [1416, 1266], [1481, 1266], [1545, 1266], [1610, 1266],
     [1674, 1266], [1739, 1266], [1803, 1266]
 ])
+PIXEL_MAP_DOME_SMOL = PIXEL_MAP_SMOL
 
 PIXEL_MAP_BIG = np.array([
     [1374, 66], [1374, 157], [1460, 239], [1374, 242], [1289, 244],
@@ -128,6 +129,7 @@ PIXEL_MAP_BIG = np.array([
     [2063, 2050], [2150, 2050], [2236, 2050], [2322, 2050], [2408, 2050],
     [2494, 2050]
 ])
+PIXEL_MAP_DOME_BIG = PIXEL_MAP_BIG
 
 PIXEL_MAP_OUTER = np.array([
     [431, 1515], [449, 1511], [454, 1494], [464, 1508], [473, 1523],
@@ -183,6 +185,7 @@ PIXEL_MAP_OUTER = np.array([
     [688, 1397], [678, 1384], [668, 1371], [659, 1358], [650, 1345],
     [640, 1332], [630, 1319], [621, 1306], [612, 1293], [602, 1280]
 ])
+PIXEL_MAP_DOME_OUTER = PIXEL_MAP_OUTER
 
 PIXEL_MAP_OUTER_FLIP = np.array([
     [1327, 1519], [1312, 1513], [1287, 1524], [1298, 1509], [1308, 1494],
@@ -239,6 +242,15 @@ PIXEL_MAP_OUTER_FLIP = np.array([
     [950, 1566], [940, 1579], [931, 1592], [921, 1605],
     [912, 1618]
 ])
+PIXEL_MAP_DOME_OUTER_FLIP = PIXEL_MAP_OUTER_FLIP
+
+PIXEL_MAP_GOGGLE = np.array(
+    [
+        [-1, -1]
+    ] * 16 + [
+        [1, 1]
+    ] * 16
+)
 
 def normalize_pix_map(pix_map):
     """Return a normalized copy of `pixel map` all x, y between 0, 1."""
@@ -375,8 +387,62 @@ PANELS = OrderedDict([
         (3, 'outer_flip', PANEL_3_SKEW, (CTRL_5_ROT + CTRL_1_ROT), rotate_vector(PANEL_3_OFFSET, (CTRL_5_ROT + CTRL_1_ROT))),
     ])
 ])
+PANELS_DOME_MAPPED_OVERHEAD = PANELS
 
-PANELS_PER_CONTROLLER = 4
+PANELS_DOME_SIMPLIFIED = OrderedDict([
+    (0, [
+        (0, 'big'),
+        (1, 'smol'),
+        (2, 'smol'),
+        (3, 'smol')
+    ]),
+    (1, [
+        (0, 'big'),
+        (1, 'smol'),
+        (2, 'smol'),
+        (3, 'smol')
+    ]),
+    (2, [
+        (0, 'big'),
+        (1, 'smol'),
+        (2, 'smol'),
+        (3, 'smol')
+    ]),
+    (3, [
+        (0, 'big'),
+        (1, 'smol'),
+        (2, 'smol'),
+        (3, 'smol')
+    ]),
+    (4, [
+        (0, 'big'),
+        (1, 'smol'),
+        (2, 'smol'),
+        (3, 'smol')
+    ])
+])
+
+PANELS_GOGGLE = OrderedDict([
+    (0, [
+        (0, 'goggle')
+    ])
+])
+
+MAPS_DOME_SIMPLIFIED = OrderedDict([
+    ('smol', normalize_pix_map(PIXEL_MAP_DOME_SMOL)),
+    ('big', normalize_pix_map(PIXEL_MAP_DOME_BIG)),
+])
+
+MAPS_DOME = OrderedDict([
+    ('smol', normalize_pix_map(PIXEL_MAP_DOME_SMOL)),
+    ('big', normalize_pix_map(PIXEL_MAP_DOME_BIG)),
+    ('outer', normalize_pix_map(PIXEL_MAP_DOME_OUTER)),
+    ('outer_flip', normalize_pix_map(PIXEL_MAP_DOME_OUTER_FLIP))
+])
+
+MAPS_GOGGLE = OrderedDict([
+    ('goggle', normalize_pix_map(PIXEL_MAP_GOGGLE))
+])
 
 def draw_map(image, pix_map_normlized, radius=1, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""

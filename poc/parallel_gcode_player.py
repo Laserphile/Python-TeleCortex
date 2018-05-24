@@ -24,9 +24,10 @@ from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PI
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
 from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, SERVERS, TelecortexSession,
+                                PANEL_LENGTHS, TelecortexSession,
                                 TelecortexSessionManager,
                                 TelecortexThreadManager)
+from telecortex.session import SERVERS_BLANK as SERVERS
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -63,43 +64,6 @@ INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 1
 INTERLEAVE = False
 GCODE_FILE = "BOKK.gcode"
-
-
-SERVERS = OrderedDict([
-    # (0, {
-    #     'file': '/dev/cu.usbmodem4057531',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
-    # (1, {
-    #     'file': '/dev/cu.usbmodem4058621',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
-    # (2, {
-    #     'file': '/dev/cu.usbmodem3176951',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
-    # (3, {
-    #     'file': '/dev/cu.usbmodem4057541',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
-    # (4, {
-    #     'file': '/dev/cu.usbmodem4058601',
-    #     'baud': 57600,
-    #     'timeout': 1
-    # }),
-])
-
-# SERVERS = OrderedDict([
-#     (0, {
-#         'file': '/dev/cu.LeviathanMini-CSRGAIA',
-#         'baud': 57600,
-#         'timeout': 1
-#     })
-# ])
 
 RE_GCODE_LINE = "(?P<server_id>\d+): (?P<cmd>\S+), (?P<args>.*), (?P<payload>\S+)"
 

@@ -16,7 +16,8 @@ import numpy as np
 from mss import mss
 from context import telecortex
 from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession, TelecortexThreadManager, SERVERS)
+                                PANEL_LENGTHS, TelecortexSession, TelecortexThreadManager)
+from telecortex.session import SERVERS_DOME as SERVERS
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER, PIXEL_MAP_OUTER_FLIP,
                                 draw_map, normalize_pix_map, rotate_mapping,
@@ -56,43 +57,6 @@ MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 3
-
-SERVERS = OrderedDict([
-    (0, {
-        'file': '/dev/cu.usbmodem4057531',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (1, {
-        'file': '/dev/cu.usbmodem4058621',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (2, {
-        'file': '/dev/cu.usbmodem3176951',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (3, {
-        'file': '/dev/cu.usbmodem4057541',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (4, {
-        'file': '/dev/cu.usbmodem4058601',
-        'baud': 57600,
-        'timeout': 1
-    }),
-])
-
-# Uncomment for Derwent config
-# SERVERS = OrderedDict([
-#     (1, {
-#         'file': '/dev/cu.usbmodem144101',
-#         'baud': 57600,
-#         'timeout': 1
-#     }),
-# ])
 
 MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
 

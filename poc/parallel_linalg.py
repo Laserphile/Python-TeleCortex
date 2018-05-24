@@ -22,9 +22,10 @@ from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PI
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
 from telecortex.session import (DEFAULT_BAUDRATE, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, SERVERS, TelecortexSession,
+                                PANEL_LENGTHS, TelecortexSession,
                                 TelecortexSessionManager,
                                 TelecortexThreadManager)
+from telecortex.session import SERVERS_DOME as SERVERS
 from telecortex.util import pix_array2text
 
 # STREAM_LOG_LEVEL = logging.DEBUG
@@ -61,42 +62,6 @@ INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 1
 INTERLEAVE = False
 
-SERVERS = OrderedDict([
-    (0, {
-        'file': '/dev/cu.usbmodem4057531',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (1, {
-        'file': '/dev/cu.usbmodem4058621',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (2, {
-        'file': '/dev/cu.usbmodem3176951',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (3, {
-        'file': '/dev/cu.usbmodem4057541',
-        'baud': 57600,
-        'timeout': 1
-    }),
-    (4, {
-        'file': '/dev/cu.usbmodem4058601',
-        'baud': 57600,
-        'timeout': 1
-    }),
-])
-
-# Uncomment for Derwent config
-# SERVERS = OrderedDict([
-#     (1, {
-#         'file': '/dev/cu.usbmodem144101',
-#         'baud': 57600,
-#         'timeout': 1
-#     }),
-# ])
 
 def fill_rainbows(image, angle=0.0):
     for col in range(IMG_SIZE):
