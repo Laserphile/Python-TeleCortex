@@ -19,7 +19,8 @@ IMG_SIZE = 256
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
-ANIM_SPEED = 5
+# ANIM_SPEED = 5
+# Note: animation speed is set in cortex_drivers for this script.
 MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
