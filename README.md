@@ -46,3 +46,6 @@ By default the scripts will log everything to the log file, and only log message
 
 Some scripts will also allow you to preview the output in an opencv window with `ENABLE_PREVIEW`.
 This is disabled by default because of its performance impact.
+
+## More info
+[Blog posts](http://blog.laserphile.com/search/label/Cortex)
