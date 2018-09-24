@@ -410,16 +410,16 @@ GENERATOR_DOME_DJ = OrderedDict([
 
 TRIF_GLOBAL_SCALE = 0.45
 TRIF_PANEL_0_SKEW = mat_scale_2d(TRIF_GLOBAL_SCALE) * mat_rotation_2d(0)
-TRIF_PANEL_0_OFFSET = (0.1 * TRIF_GLOBAL_SCALE, 0)
+TRIF_PANEL_0_OFFSET = (0.2 * TRIF_GLOBAL_SCALE, 0)
 TRIF_PANEL_1_SKEW = mat_scale_2d(TRIF_GLOBAL_SCALE)
-TRIF_PANEL_1_OFFSET = (-0.7 * TRIF_GLOBAL_SCALE, 0)
+TRIF_PANEL_1_OFFSET = (-0.6 * TRIF_GLOBAL_SCALE, 0)
 
 GENERATOR_TRIFORCE = OrderedDict([
     (0, [
         (0, 'big', TRIF_PANEL_0_SKEW, 90, TRIF_PANEL_0_OFFSET),
         (1, 'big', TRIF_PANEL_1_SKEW, -90, rotate_vector(TRIF_PANEL_1_OFFSET, 0)),
-        (2, 'big', TRIF_PANEL_1_SKEW, -90 + 120, rotate_vector(TRIF_PANEL_1_OFFSET, 120)),
-        (3, 'big', TRIF_PANEL_1_SKEW, -90 + 240, rotate_vector(TRIF_PANEL_1_OFFSET, 240))
+        (2, 'big', TRIF_PANEL_1_SKEW, -90, rotate_vector(TRIF_PANEL_1_OFFSET, 120)),
+        (3, 'big', TRIF_PANEL_1_SKEW, -90, rotate_vector(TRIF_PANEL_1_OFFSET, 240))
     ])
 ])
 
