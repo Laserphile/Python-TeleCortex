@@ -2,12 +2,18 @@ import argparse
 import logging
 import os
 import re
+from builtins import super
 from pprint import pformat, pprint
 
 import coloredlogs
-from telecortex.mapping import MAPS_DOME_OVERHEAD, MAPS_DOME_DJ, MAPS_DOME_SIMPLIFIED, MAPS_GOGGLE
-from telecortex.mapping import PANELS_DOME_SIMPLIFIED, PANELS_DOME_OVERHEAD, PANELS_DOME_DJ, PANELS_GOGGLE
-from telecortex.session import SERVERS_DOME, SERVERS_SINGLE
+from telecortex.mapping import (MAPS_DOME_DJ, MAPS_DOME_OVERHEAD,
+                                MAPS_DOME_SIMPLIFIED, MAPS_DOME_TRIFORCE,
+                                MAPS_GOGGLE, PANELS_DOME_DJ,
+                                PANELS_DOME_OVERHEAD, PANELS_DOME_SIMPLIFIED,
+                                PANELS_DOME_TRIFORCE, PANELS_GOGGLE)
+from telecortex.session import (SERVERS_DOME, SERVERS_SINGLE,
+                                TelecortexSession, TelecortexSessionManager,
+                                TelecortexVirtualManager, VirtualTelecortexSession)
 
 
 class TeleCortexConfig(object):
@@ -19,10 +25,15 @@ class TeleCortexConfig(object):
         self.parser.add_argument('--verbosity', action='store', dest='verbose', type=int)
         self.parser.add_argument('--quiet', '-q', action='store_const', const=0, dest='verbose')
         self.parser.add_argument('--enable-log-file', default=False)
+        self.parser.add_argument('--max-ack-queue', default=5, type=int)
+        self.parser.add_argument('--do-crc', default=True)
+        self.parser.add_argument('--skip-crc', action='store_false', dest='do_crc')
+        self.parser.add_argument('--virtual', action='store_true')
+
         # self.parser.add_argument('--disable-log-file', action='store_false', dest='enable_log_file')
         self.parser.add_argument(
             '--config',
-            choices=['dome', 'dome_simplified', 'single', 'goggles'],
+            choices=['dome', 'dome_simplified', 'dome_overhead', 'single', 'goggles', 'triforce'],
             default=default_config
         )
         self.args = argparse.Namespace()
@@ -36,6 +47,12 @@ class TeleCortexConfig(object):
     @property
     def log_file(self):
         return ".%s.log" % self.handle
+
+    @property
+    def quiet(self):
+        if hasattr(self.args, 'verbose') and self.args.verbose is not None:
+            return self.args.verbose == 0
+        return False
 
     @property
     def log_level(self):
@@ -54,6 +71,7 @@ class TeleCortexConfig(object):
             'dome_overhead': SERVERS_DOME,
             'dome_dj': SERVERS_DOME,
             'dome_simplified': SERVERS_DOME,
+            'triforce': SERVERS_SINGLE,
             'single': SERVERS_SINGLE,
             'goggles': SERVERS_SINGLE,
         }.get(self.args.config, SERVERS_SINGLE)
@@ -62,6 +80,7 @@ class TeleCortexConfig(object):
             'dome_overhead': MAPS_DOME_OVERHEAD,
             'dome_dj': MAPS_DOME_DJ,
             'dome_simplified': MAPS_DOME_SIMPLIFIED,
+            'triforce': MAPS_DOME_TRIFORCE,
             'single': MAPS_DOME_SIMPLIFIED,
             'goggles': MAPS_GOGGLE,
         }.get(self.args.config, MAPS_DOME_SIMPLIFIED)
@@ -70,6 +89,7 @@ class TeleCortexConfig(object):
             'dome_overhead': PANELS_DOME_OVERHEAD,
             'dome_dj': PANELS_DOME_DJ,
             'dome_simplified': PANELS_DOME_SIMPLIFIED,
+            'triforce': PANELS_DOME_TRIFORCE,
             'single': PANELS_DOME_SIMPLIFIED,
             'goggles': PANELS_GOGGLE
         }.get(self.args.config, PANELS_DOME_SIMPLIFIED)
@@ -77,10 +97,14 @@ class TeleCortexConfig(object):
         logging.debug("conf.servers:\n%s" % pformat(self.servers))
         logging.debug("conf.maps:\n%s" % pformat(self.maps))
         logging.debug("conf.panels:\n%s" % pformat(self.panels))
+        logging.debug("conf.args:\n%s" % pformat(vars(self.args)))
 
     def setup_logger(self):
         self.logger = logging.getLogger()
-        self.logger.setLevel(logging.DEBUG)
+        if self.quiet:
+            self.logger.setLevel(logging.CRITICAL)
+        else:
+            self.logger.setLevel(logging.DEBUG)
         self.file_handler = logging.FileHandler(self.log_file)
         self.file_handler.setLevel(logging.DEBUG)
         if self.args.enable_log_file:

@@ -407,6 +407,22 @@ GENERATOR_DOME_DJ = OrderedDict([
     # To do
 ])
 
+
+TRIF_GLOBAL_SCALE = 0.45
+TRIF_PANEL_0_SKEW = mat_scale_2d(TRIF_GLOBAL_SCALE) * mat_rotation_2d(0)
+TRIF_PANEL_0_OFFSET = (0.1 * TRIF_GLOBAL_SCALE, 0)
+TRIF_PANEL_1_SKEW = mat_scale_2d(TRIF_GLOBAL_SCALE)
+TRIF_PANEL_1_OFFSET = (-0.6 * TRIF_GLOBAL_SCALE, 0)
+
+GENERATOR_DOME_TRIFORCE = OrderedDict([
+    (0, [
+        (0, 'big', TRIF_PANEL_0_SKEW, 90, TRIF_PANEL_0_OFFSET),
+        (1, 'smol', TRIF_PANEL_1_SKEW, -90, rotate_vector(TRIF_PANEL_1_OFFSET, 0)),
+        (2, 'smol', TRIF_PANEL_1_SKEW, -90 + 120, rotate_vector(TRIF_PANEL_1_OFFSET, 120)),
+        (3, 'smol', TRIF_PANEL_1_SKEW, -90 + 240, rotate_vector(TRIF_PANEL_1_OFFSET, 240))
+    ])
+])
+
 PANELS_DOME_SIMPLIFIED = OrderedDict([
     (0, [
         (0, 'big'),
@@ -476,6 +492,7 @@ def generate_panel_maps(generator):
 
 MAPS_DOME_OVERHEAD, PANELS_DOME_OVERHEAD = generate_panel_maps(GENERATOR_DOME_OVERHEAD)
 MAPS_DOME_DJ, PANELS_DOME_DJ = generate_panel_maps(GENERATOR_DOME_DJ)
+MAPS_DOME_TRIFORCE, PANELS_DOME_TRIFORCE = generate_panel_maps(GENERATOR_DOME_TRIFORCE)
 
 def draw_map(image, pix_map_normlized, radius=1, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""
