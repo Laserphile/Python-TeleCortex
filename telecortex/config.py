@@ -116,3 +116,34 @@ class TeleCortexConfig(object):
         self.stream_handler.addFilter(coloredlogs.HostNameFilter())
         self.stream_handler.addFilter(coloredlogs.ProgramNameFilter())
         self.logger.addHandler(self.stream_handler)
+
+class TeleCortexSessionConfig(TeleCortexConfig):
+    """
+    Config for a single session
+    """
+    def setup_session(self, ser):
+        session_class = VirtualTelecortexSession if self.args.virtual else TelecortexSession
+        sesh = session_class(
+            ser,
+            max_ack_queue=self.args.max_ack_queue,
+            do_crc=self.args.do_crc
+        )
+        sesh.reset_board()
+        return sesh
+
+class TeleCortexManagerConfig(TeleCortexConfig):
+    """
+    Config for multiple managed sessions
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def setup_manager(self):
+        manager_class = TelecortexVirtualManager if self.args.virtual else TelecortexSessionManager
+        manager = manager_class(
+            self.servers,
+            max_ack_queue=self.args.max_ack_queue,
+            do_crc=self.args.do_crc
+        )
+        return manager

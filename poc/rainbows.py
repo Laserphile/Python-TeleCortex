@@ -6,6 +6,7 @@ import itertools
 import logging
 import os
 from datetime import datetime
+import time
 
 import serial
 from serial.tools import list_ports
@@ -16,7 +17,7 @@ from context import telecortex
 from telecortex.session import (PANEL_LENGTHS, DEFAULT_BAUD,
                                 TEENSY_VID, find_serial_dev, TelecortexSession)
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexConfig
+from telecortex.config import TeleCortexSessionConfig
 
 def main():
     """
@@ -28,13 +29,21 @@ def main():
     Respond to microcontroller
     """
 
-    conf = TeleCortexConfig(
+    conf = TeleCortexSessionConfig(
         name="rainbowz",
         description="send rainbows to a single telecortex controller as fast as possible",
         default_config='single'
     )
-    conf.parser.add_argument('--do-single', default=False, action='store_true')
+    conf.parser.add_argument(
+        '--do-single', default=False, action='store_true',
+        help="if true, send a single colour to the board, otherwise send a rainbow string"
+    )
+    # conv.parser.add_argument(
+    #     '--virtual', default=False, action='store_true',
+    #     help="use virtual sessions (when debugging without access to device)"
+    # )
     conf.parser.add_argument('--serial-dev',)
+    conf.parser.add_argument('--serial-baud', default=DEFAULT_BAUD)
 
     conf.parse_args()
 
@@ -47,16 +56,14 @@ def main():
         raise UserWarning("target device not found")
     else:
         logging.debug("target_device: %s" % target_device)
-        logging.debug("baud: %s" % DEFAULT_BAUD)
+        logging.debug("baud: %s" % conf.args.serial_baud)
     # Connect to serial
     frameno = 0
     with serial.Serial(
-        port=target_device, baudrate=DEFAULT_BAUD, timeout=1
+        port=target_device, baudrate=conf.args.serial_baud, timeout=1
     ) as ser:
         # logging.debug("settings: %s" % pformat(ser.get_settings()))
-        sesh = TelecortexSession(ser)
-        sesh.reset_board()
-
+        sesh = conf.setup_session(ser)
         while sesh:
 
             # H = frameno, S = 255 (0xff), V = 127 (0x7f)
@@ -66,7 +73,7 @@ def main():
                     pixel_str = pix_array2text(
                         frameno, 255, 127
                     )
-                    sesh.send_cmd_without_linenum("M2603", {"Q":panel, "V":pixel_str})
+                    sesh.send_cmd_with_linenum("M2603", {"Q":panel, "V":pixel_str})
                 else:
                     panel_length = len(conf.maps[map_name])
                     logging.debug(
@@ -82,6 +89,10 @@ def main():
                     sesh.chunk_payload_with_linenum("M2601", {"Q":panel}, pixel_str)
             sesh.send_cmd_with_linenum("M2610")
             frameno = (frameno + 1) % 255
+
+            while not sesh.ready:
+                logging.debug("waiting on queue")
+                time.sleep(0.1)
 
 
 if __name__ == '__main__':
