@@ -21,12 +21,11 @@ from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
                                 normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
                                 transpose_mapping, draw_map)
 from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
-from telecortex.mapping import MAPS_DOME, transform_panel_map
-from telecortex.session import SERVERS, TelecortexSessionManager
+from telecortex.mapping import transform_panel_map
+from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexConfig
+from telecortex.config import TeleCortexManagerConfig
 
-ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
 
 IMG_SIZE = 256
@@ -48,7 +47,7 @@ def fill_rainbows(image, angle=0.0):
     return image
 
 def main():
-    conf = TeleCortexConfig(
+    conf = TeleCortexManagerConfig(
         name="linalg",
         description="draw a single rainbow spanning several telecortex controllers",
         default_config='dome_overhead'
@@ -56,7 +55,7 @@ def main():
 
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    manager = TelecortexSessionManager(conf.servers)
+    conf.parse_args()
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
@@ -72,28 +71,19 @@ def main():
         cv2.moveWindow(MAIN_WINDOW, 500, 0)
         key = cv2.waitKey(2) & 0xFF
 
-    pixel_map_cache = OrderedDict()
-
     start_time = time_now()
 
-    while any([manager.sessions.get(server_id) for server_id in PANELS]):
+    manager = conf.setup_manager()
+
+    while any([manager.sessions.get(server_id) for server_id in conf.servers]):
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
-        for server_id, server_panel_info in PANELS.items():
+        for server_id, server_panel_info in conf.panels.items():
             if not manager.sessions.get(server_id):
                 continue
-            for panel_number, size, scale, angle, offset in server_panel_info:
-                if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if size not in MAPS_DOME:
-                        raise UserWarning('Panel size %s not in known mappings: %s' %(
-                            size, MAPS_DOME.keys()
-                        ))
-                    panel_map = MAPS_DOME[size]
-                    panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
-                    pixel_map_cache[(server_id, panel_number)] = panel_map
-                else:
-                    panel_map = pixel_map_cache[(server_id, panel_number)]
+            for panel_number, map_name in server_panel_info:
+                panel_map = conf.maps[map_name]
 
                 pixel_list = interpolate_pixel_map(
                     img, panel_map, INTERPOLATION_TYPE
@@ -107,10 +97,10 @@ def main():
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
         if ENABLE_PREVIEW:
-            for map in pixel_map_cache.values():
-                draw_map(img, map, DOT_RADIUS+1, outline=(255, 255, 255))
-            for map in pixel_map_cache.values():
-                draw_map(img, map, DOT_RADIUS)
+            for map_name, mapping in conf.maps.items():
+                draw_map(img, mapping, DOT_RADIUS+1, outline=(255, 255, 255))
+            for map_name, mapping in conf.maps.items():
+                draw_map(img, mapping, DOT_RADIUS)
             cv2.imshow(MAIN_WINDOW, img)
             if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
                 key = cv2.waitKey(2) & 0xFF
