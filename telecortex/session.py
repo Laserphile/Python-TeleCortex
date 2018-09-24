@@ -4,6 +4,7 @@ import base64
 import itertools
 import logging
 import os
+import sys
 import re
 import time
 from collections import OrderedDict, deque
@@ -172,6 +173,7 @@ class TelecortexSession(object):
 
     chunk_size = 261
     ser_buff_size = int(1.2 * chunk_size)
+    serial_class = serial.Serial
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line = r"^N(?P<linenum>\d+)"
@@ -235,7 +237,7 @@ class TelecortexSession(object):
     @classmethod
     def from_serial_conf(cls, serial_conf, linenum=0):
         # TODO: I don't think this works because of garbage collection?
-        ser = serial.Serial(
+        ser = cls.serial_class(
             port=serial_conf.get('port'),
             baudrate=serial_conf.get('baud', DEFAULT_BAUD),
             timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
@@ -611,6 +613,8 @@ class TelecortexSession(object):
         self.ser.close()
 
 class VirtualTelecortexSession(TelecortexSession):
+    serial_class = dict
+
     def __init__(self, *args, **kwargs):
         kwargs['ignore_acks'] = True
         super().__init__(*args, **kwargs)
@@ -651,9 +655,13 @@ servers is a list of objects containing information about a server's configurati
 """
 
 class TeleCortexBaseManager(object):
-    def __init__(self, servers):
+    serial_class = serial.Serial
+    session_class = TelecortexSession
+
+    def __init__(self, servers, **kwargs):
         self.servers = servers
         self.known_cids = OrderedDict()
+        self.session_kwargs = kwargs
 
     def get_serial_conf(self, server_info):
 
@@ -692,12 +700,12 @@ class TeleCortexBaseManager(object):
                     if cid != server_info.get('cid'):
                         continue
                 else:
-                    ser = serial.Serial(
+                    ser = self.serial_class(
                         port=port,
                         baudrate=server_info.get('baud', DEFAULT_BAUD),
                         timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
                     )
-                    sesh = TelecortexSession(ser)
+                    sesh = self.session_class(ser)
                     sesh.reset_board()
                     if server_info.get('cid') is not None:
                         cid = int(sesh.get_cid())
@@ -737,7 +745,6 @@ class TelecortexSessionManager(TeleCortexBaseManager):
     def __init__(self, servers, **kwargs):
         super(TelecortexSessionManager, self).__init__(servers)
         self.sessions = OrderedDict()
-        self.session_kwargs = kwargs
         self.refresh_connections()
 
     def refresh_connections(self):
@@ -765,12 +772,12 @@ class TelecortexSessionManager(TeleCortexBaseManager):
             serial_conf = self.get_serial_conf(server_info)
 
             if serial_conf:
-                ser = serial.Serial(
+                ser = self.serial_class(
                     port=serial_conf['file'],
                     baudrate=serial_conf['baud'],
                     timeout=serial_conf['timeout'],
                 )
-                sesh = TelecortexSession(ser, **self.session_kwargs)
+                sesh = self.session_class(ser, **self.session_kwargs)
                 sesh.reset_board()
                 logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
@@ -788,27 +795,37 @@ class TelecortexSessionManager(TeleCortexBaseManager):
     def __exit__(self, *args, **kwargs):
         self.close()
 
-class TelecortexVirtualManager(TelecortexSessionManager):
+class TelecortexVirtualManagerMixin(object):
     """
     Don't actually create any connections
     """
-    def refresh_connections(self):
-        for server_id, server_info in self.servers.items():
-            self.sessions[server_id] = VirtualTelecortexSession(
-                ser=None,
-                **self.session_kwargs
-            )
+    serial_class = dict
+    session_class = VirtualTelecortexSession
+
+    def get_serial_conf(self, server_info):
+        return {
+            'file': server_info.get('file', "VIRTUAL"),
+            'baud': server_info.get('baud', DEFAULT_BAUD),
+            'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
+        }
+
+
+class TelecortexVirtualManager(TelecortexSessionManager, TelecortexVirtualManagerMixin):
+    serial_class = TelecortexVirtualManagerMixin.serial_class
+    session_class =  TelecortexVirtualManagerMixin.session_class
+    get_serial_conf = TelecortexVirtualManagerMixin.get_serial_conf
 
 class TelecortexThreadManager(TeleCortexBaseManager):
-    def __init__(self, servers):
-        super(TelecortexThreadManager, self).__init__(servers)
+
+    def __init__(self, servers, **kwargs):
+        super(TelecortexThreadManager, self).__init__(servers, **kwargs)
         self.threads = OrderedDict()
         self.refresh_connections()
 
-    @staticmethod
-    def controller_thread(serial_conf, queue):
+    @classmethod
+    def controller_thread(cls, serial_conf, queue):
         # setup serial device
-        ser = serial.Serial(
+        ser = cls.serial_class(
             port=serial_conf['file'],
             baudrate=serial_conf['baud'],
             timeout=serial_conf['timeout'],
@@ -817,7 +834,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             # dsrdtr=True
         )
         logging.debug("setting up serial sesh: %s" % ser)
-        sesh = TelecortexSession(ser)
+        sesh = cls.session_class(ser)
         sesh.reset_board()
         sesh.get_cid()
         # listen for commands
@@ -834,6 +851,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         if server_ids is None:
             server_ids = self.servers.keys()
 
+        assert sys.version_info > (3, 0), "multiprocessing only works properly on python 3"
         ctx = mp.get_context('fork')
 
         for server_id in server_ids:
@@ -885,6 +903,11 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             except Exception as exc:
                 raise UserWarning("unhandled exception: %s" % str(exc))
             break
+
+class TeleCortexVirtualThreadManager(TelecortexThreadManager, TelecortexVirtualManagerMixin):
+    serial_class = TelecortexVirtualManagerMixin.serial_class
+    session_class =  TelecortexVirtualManagerMixin.session_class
+    get_serial_conf = TelecortexVirtualManagerMixin.get_serial_conf
 
 class TeleCortexCacheManager(TeleCortexBaseManager):
     def __init__(self, servers, cache_file):
