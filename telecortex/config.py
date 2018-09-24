@@ -13,7 +13,7 @@ from telecortex.mapping import (MAPS_DOME_DJ, MAPS_DOME_OVERHEAD,
                                 PANELS_DOME_TRIFORCE, PANELS_GOGGLE, MAPS_TRIFORCE, PANELS_TRIFORCE)
 from telecortex.session import (SERVERS_DOME, SERVERS_SINGLE,
                                 TelecortexSession, TelecortexSessionManager,
-                                TelecortexVirtualManager, VirtualTelecortexSession)
+                                TelecortexVirtualManager, VirtualTelecortexSession, TelecortexThreadManager, TeleCortexVirtualThreadManager)
 
 
 class TeleCortexConfig(object):
@@ -139,14 +139,21 @@ class TeleCortexManagerConfig(TeleCortexConfig):
     Config for multiple managed sessions
     """
 
+    real_manager_class = TelecortexSessionManager
+    virtual_manager_class = TelecortexVirtualManager
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def setup_manager(self):
-        manager_class = TelecortexVirtualManager if self.args.virtual else TelecortexSessionManager
+        manager_class = self.virtual_manager_class if self.args.virtual else self.real_manager_class
         manager = manager_class(
             self.servers,
             max_ack_queue=self.args.max_ack_queue,
             do_crc=self.args.do_crc
         )
         return manager
+
+class TeleCortexThreadManagerConfic(TeleCortexManagerConfig):
+    real_manager_class = TelecortexThreadManager
+    virtual_manager_class = TeleCortexVirtualThreadManager
