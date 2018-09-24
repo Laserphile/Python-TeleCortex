@@ -412,14 +412,29 @@ TRIF_GLOBAL_SCALE = 0.45
 TRIF_PANEL_0_SKEW = mat_scale_2d(TRIF_GLOBAL_SCALE) * mat_rotation_2d(0)
 TRIF_PANEL_0_OFFSET = (0.1 * TRIF_GLOBAL_SCALE, 0)
 TRIF_PANEL_1_SKEW = mat_scale_2d(TRIF_GLOBAL_SCALE)
-TRIF_PANEL_1_OFFSET = (-0.6 * TRIF_GLOBAL_SCALE, 0)
+TRIF_PANEL_1_OFFSET = (-0.7 * TRIF_GLOBAL_SCALE, 0)
+
+GENERATOR_TRIFORCE = OrderedDict([
+    (0, [
+        (0, 'big', TRIF_PANEL_0_SKEW, 90, TRIF_PANEL_0_OFFSET),
+        (1, 'big', TRIF_PANEL_1_SKEW, -90, rotate_vector(TRIF_PANEL_1_OFFSET, 0)),
+        (2, 'big', TRIF_PANEL_1_SKEW, -90 + 120, rotate_vector(TRIF_PANEL_1_OFFSET, 120)),
+        (3, 'big', TRIF_PANEL_1_SKEW, -90 + 240, rotate_vector(TRIF_PANEL_1_OFFSET, 240))
+    ])
+])
+
+DOME_TRIF_GLOBAL_SCALE = 0.45
+DOME_TRIF_PANEL_0_SKEW = mat_scale_2d(DOME_TRIF_GLOBAL_SCALE) * mat_rotation_2d(0)
+DOME_TRIF_PANEL_0_OFFSET = (0.1 * DOME_TRIF_GLOBAL_SCALE, 0)
+DOME_TRIF_PANEL_1_SKEW = mat_scale_2d(DOME_TRIF_GLOBAL_SCALE)
+DOME_TRIF_PANEL_1_OFFSET = (-0.6 * DOME_TRIF_GLOBAL_SCALE, 0)
 
 GENERATOR_DOME_TRIFORCE = OrderedDict([
     (0, [
-        (0, 'big', TRIF_PANEL_0_SKEW, 90, TRIF_PANEL_0_OFFSET),
-        (1, 'smol', TRIF_PANEL_1_SKEW, -90, rotate_vector(TRIF_PANEL_1_OFFSET, 0)),
-        (2, 'smol', TRIF_PANEL_1_SKEW, -90 + 120, rotate_vector(TRIF_PANEL_1_OFFSET, 120)),
-        (3, 'smol', TRIF_PANEL_1_SKEW, -90 + 240, rotate_vector(TRIF_PANEL_1_OFFSET, 240))
+        (0, 'big', DOME_TRIF_PANEL_0_SKEW, 90, DOME_TRIF_PANEL_0_OFFSET),
+        (1, 'smol', DOME_TRIF_PANEL_1_SKEW, -90, rotate_vector(DOME_TRIF_PANEL_1_OFFSET, 0)),
+        (2, 'smol', DOME_TRIF_PANEL_1_SKEW, -90 + 120, rotate_vector(DOME_TRIF_PANEL_1_OFFSET, 120)),
+        (3, 'smol', DOME_TRIF_PANEL_1_SKEW, -90 + 240, rotate_vector(DOME_TRIF_PANEL_1_OFFSET, 240))
     ])
 ])
 
@@ -493,6 +508,7 @@ def generate_panel_maps(generator):
 MAPS_DOME_OVERHEAD, PANELS_DOME_OVERHEAD = generate_panel_maps(GENERATOR_DOME_OVERHEAD)
 MAPS_DOME_DJ, PANELS_DOME_DJ = generate_panel_maps(GENERATOR_DOME_DJ)
 MAPS_DOME_TRIFORCE, PANELS_DOME_TRIFORCE = generate_panel_maps(GENERATOR_DOME_TRIFORCE)
+MAPS_TRIFORCE, PANELS_TRIFORCE = generate_panel_maps(GENERATOR_TRIFORCE)
 
 def draw_map(image, pix_map_normlized, radius=1, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""

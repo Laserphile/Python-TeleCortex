@@ -10,7 +10,7 @@ from telecortex.mapping import (MAPS_DOME_DJ, MAPS_DOME_OVERHEAD,
                                 MAPS_DOME_SIMPLIFIED, MAPS_DOME_TRIFORCE,
                                 MAPS_GOGGLE, PANELS_DOME_DJ,
                                 PANELS_DOME_OVERHEAD, PANELS_DOME_SIMPLIFIED,
-                                PANELS_DOME_TRIFORCE, PANELS_GOGGLE)
+                                PANELS_DOME_TRIFORCE, PANELS_GOGGLE, MAPS_TRIFORCE, PANELS_TRIFORCE)
 from telecortex.session import (SERVERS_DOME, SERVERS_SINGLE,
                                 TelecortexSession, TelecortexSessionManager,
                                 TelecortexVirtualManager, VirtualTelecortexSession)
@@ -71,6 +71,7 @@ class TeleCortexConfig(object):
             'dome_overhead': SERVERS_DOME,
             'dome_dj': SERVERS_DOME,
             'dome_simplified': SERVERS_DOME,
+            'dome_triforce': SERVERS_SINGLE,
             'triforce': SERVERS_SINGLE,
             'single': SERVERS_SINGLE,
             'goggles': SERVERS_SINGLE,
@@ -80,7 +81,8 @@ class TeleCortexConfig(object):
             'dome_overhead': MAPS_DOME_OVERHEAD,
             'dome_dj': MAPS_DOME_DJ,
             'dome_simplified': MAPS_DOME_SIMPLIFIED,
-            'triforce': MAPS_DOME_TRIFORCE,
+            'dome_triforce': MAPS_DOME_TRIFORCE,
+            'triforce': MAPS_TRIFORCE,
             'single': MAPS_DOME_SIMPLIFIED,
             'goggles': MAPS_GOGGLE,
         }.get(self.args.config, MAPS_DOME_SIMPLIFIED)
@@ -89,7 +91,8 @@ class TeleCortexConfig(object):
             'dome_overhead': PANELS_DOME_OVERHEAD,
             'dome_dj': PANELS_DOME_DJ,
             'dome_simplified': PANELS_DOME_SIMPLIFIED,
-            'triforce': PANELS_DOME_TRIFORCE,
+            'dome_triforce': PANELS_DOME_TRIFORCE,
+            'triforce': PANELS_TRIFORCE,
             'single': PANELS_DOME_SIMPLIFIED,
             'goggles': PANELS_GOGGLE
         }.get(self.args.config, PANELS_DOME_SIMPLIFIED)
