@@ -53,9 +53,9 @@ def main():
         default_config='dome_overhead'
     )
 
-    logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
-
     conf.parse_args()
+
+    logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
@@ -75,7 +75,7 @@ def main():
 
     manager = conf.setup_manager()
 
-    while any([manager.sessions.get(server_id) for server_id in conf.servers]):
+    while any([manager.sessions.get(server_id) for server_id in conf.panels]):
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
         fill_rainbows(img, frameno)
 

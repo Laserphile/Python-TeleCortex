@@ -17,11 +17,12 @@ import cv2
 import numpy as np
 from context import telecortex
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
                                 normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
                                 transpose_mapping, draw_map)
-from telecortex.session import SERVERS, TelecortexSessionManager
+from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
+from telecortex.config import TeleCortexManagerConfig
 
 # STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
@@ -98,9 +99,15 @@ def fill_rainbows(image, angle=0.0):
     return image
 
 def main():
-    logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
+    conf = TeleCortexManagerConfig(
+        name="session",
+        description="draw a single rainbow spanning onto telecortex controllers",
+        default_config='dome_overhead'
+    )
 
-    manager = TelecortexSessionManager(SERVERS)
+    conf.parse_args()
+
+    logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
@@ -117,9 +124,14 @@ def main():
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
         cv2.imshow(MAIN_WINDOW, img)
 
+        cv2.moveWindow(MAIN_WINDOW, 500, 0)
+        key = cv2.waitKey(2) & 0xFF
+
     start_time = time_now()
 
-    while any([manager.sessions.get(server_id) for server_id in PANELS]):
+    manager = conf.setup_manager()
+
+    while any([manager.sessions.get(server_id) for server_id in conf.panels]):
         frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
@@ -131,13 +143,13 @@ def main():
         )
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
-        for server_id, server_panel_info in PANELS.items():
+        for server_id, server_panel_info in conf.panels.items():
             if not manager.sessions.get(server_id):
                 continue
-            for panel_number, size in server_panel_info:
-                if size == 'big':
+            for panel_number, panel_name in server_panel_info:
+                if panel_name.startswith('big'):
                     pixel_str = pixel_str_big
-                elif size == 'smol':
+                elif panel_name.startswith('smol'):
                     pixel_str = pixel_str_smol
 
                 manager.sessions[server_id].chunk_payload_with_linenum(
