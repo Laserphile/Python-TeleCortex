@@ -11,6 +11,7 @@ from datetime import datetime
 from pprint import pformat, pprint
 from copy import deepcopy
 import queue
+from builtins import super
 import json
 
 import serial
@@ -38,8 +39,6 @@ TEENSY_VID = 0x16C0
 PANEL_LENGTHS = [
     316, 260, 260, 260
 ]
-
-IGNORE_ACKS = False
 
 def find_serial_dev(vid=None, pid=None, ser=None):
     """
@@ -173,7 +172,6 @@ class TelecortexSession(object):
 
     chunk_size = 261
     ser_buff_size = int(1.2 * chunk_size)
-    max_ack_queue = 5
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line = r"^N(?P<linenum>\d+)"
@@ -190,9 +188,8 @@ class TelecortexSession(object):
         r"PIX_RATE:\s+(?P<pix_rate>[\d\.]+)\s*pps,?\s*"
         r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
     ) % re_loo
-    do_crc = True
 
-    def __init__(self, ser, linecount=0):
+    def __init__(self, ser, linecount=0, **kwargs):
         super(TelecortexSession, self).__init__()
         self.ser = ser
         self.linecount = linecount
@@ -202,6 +199,10 @@ class TelecortexSession(object):
         self.cid = 0
         self.line_buffer = ""
         self.line_queue = deque()
+        self.max_ack_queue = kwargs.get('max_ack_queue', 5)
+        assert isinstance(self.max_ack_queue, six.integer_types)
+        self.do_crc = kwargs.get('do_crc', True)
+        self.ignore_acks = kwargs.get('ignore_acks', False)
 
     @property
     def lines_avail(self):
@@ -260,9 +261,9 @@ class TelecortexSession(object):
         """
         cmd_obj = TelecortexLineCommand(self, self.linecount, cmd, args)
         self.send_cmd_obj(cmd_obj)
-        if not IGNORE_ACKS:
+        if not self.ignore_acks:
             self.ack_queue[self.linecount] = cmd_obj
-        logging.debug("sending cmd with lineno, %s" % repr(cmd_obj.fmt()))
+        logging.debug("sending cmd with lineno, %s, ack_queue: %s" % (repr(cmd_obj.fmt(checksum=self.do_crc)), self.ack_queue.keys()))
         self.linecount += 1
 
     def send_cmd_without_linenum(self, cmd, args=None):
@@ -596,17 +597,11 @@ class TelecortexSession(object):
 
     @property
     def ready(self):
-        if IGNORE_ACKS:
+        if self.ignore_acks:
             return True
         if len(self.ack_queue) > self.max_ack_queue:
             return False
-        ser_buff_len = 0
-        for linenum, ack_cmd in self.ack_queue.items():
-            if ack_cmd[0] == "M110":
-                return False
-            ser_buff_len += len(self.fmt_cmd(linenum, *ack_cmd))
-            if ser_buff_len > self.ser_buff_size:
-                return False
+
         return True
 
     def __nonzero__(self):
@@ -614,6 +609,41 @@ class TelecortexSession(object):
 
     def close(self):
         self.ser.close()
+
+class VirtualTelecortexSession(TelecortexSession):
+    def __init__(self, *args, **kwargs):
+        kwargs['ignore_acks'] = True
+        super().__init__(*args, **kwargs)
+
+    @property
+    def lines_avail(self):
+        pass
+
+    def write_line(self, text):
+        pass
+
+    def get_line(self):
+        pass
+
+    @property
+    def bytes_left(self):
+        return self.chunk_size * 2
+
+    def parse_responses(self):
+        time.sleep(0.01)
+        if self.ack_queue:
+            self.clear_ack_queue()
+
+    @property
+    def ready(self):
+        self.parse_responses()
+        return True
+
+    def __nonzero__(self):
+        return True
+
+    def close(self):
+        pass
 
 
 """
@@ -703,9 +733,11 @@ class TeleCortexBaseManager(object):
         raise NotImplementedError()
 
 class TelecortexSessionManager(TeleCortexBaseManager):
-    def __init__(self, servers):
+
+    def __init__(self, servers, **kwargs):
         super(TelecortexSessionManager, self).__init__(servers)
         self.sessions = OrderedDict()
+        self.session_kwargs = kwargs
         self.refresh_connections()
 
     def refresh_connections(self):
@@ -738,7 +770,7 @@ class TelecortexSessionManager(TeleCortexBaseManager):
                     baudrate=serial_conf['baud'],
                     timeout=serial_conf['timeout'],
                 )
-                sesh = TelecortexSession(ser)
+                sesh = TelecortexSession(ser, **self.session_kwargs)
                 sesh.reset_board()
                 logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
@@ -755,6 +787,17 @@ class TelecortexSessionManager(TeleCortexBaseManager):
 
     def __exit__(self, *args, **kwargs):
         self.close()
+
+class TelecortexVirtualManager(TelecortexSessionManager):
+    """
+    Don't actually create any connections
+    """
+    def refresh_connections(self):
+        for server_id, server_info in self.servers.items():
+            self.sessions[server_id] = VirtualTelecortexSession(
+                ser=None,
+                **self.session_kwargs
+            )
 
 class TelecortexThreadManager(TeleCortexBaseManager):
     def __init__(self, servers):
