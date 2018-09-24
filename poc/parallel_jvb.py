@@ -11,9 +11,9 @@ from cortex_drivers import PanelDriver
 # noinspection PyUnresolvedReferences
 from context import telecortex
 from telecortex.session import (TelecortexThreadManager)
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, normalize_pix_map)
+from telecortex.mapping import (normalize_pix_map, MAPS_DOME_SIMPLIFIED)
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexConfig
+from telecortex.config import TeleCortexThreadManagerConfic
 
 IMG_SIZE = 256
 MAX_HUE = 1.0
@@ -44,7 +44,7 @@ def direct_rainbows(pix_map, angle=0.):
     return pixel_list
 
 def main():
-    conf = TeleCortexConfig(
+    conf = TeleCortexThreadManagerConfic(
         name="parallel_jvb",
         description="send fucked up rainbow circles to several telecortex controllers in parallel",
         default_config='dome_simplified'
@@ -54,15 +54,16 @@ def main():
 
     conf.parser.print_help()
 
-    manager = TelecortexThreadManager(conf.servers)
-
-    pix_map_normlized_smol = conf.maps['smol']
-    pix_map_normlized_big = conf.maps['big']
+    pix_map_normlized_smol = MAPS_DOME_SIMPLIFIED['smol']
+    pix_map_normlized_big = MAPS_DOME_SIMPLIFIED['big']
 
     frameno = 0
     seed = random.random() * 50
     start_time = time_now()
     five_minutes = 60 * 5
+
+    manager = conf.setup_manager()
+
     while manager:
         frameno += 1
         if frameno > 2 ** 16 or (start_time - time_now() > five_minutes):
@@ -77,7 +78,8 @@ def main():
         for server_id, server_panel_info in conf.panels.items():
             if not manager.threads.get(server_id):
                 continue
-            for panel_number, size in server_panel_info:
+            for panel_number, map_name in server_panel_info:
+                size = map_name.split('-')[0]
                 if size == 'big':
                     pixel_str = pixel_str_big
                 elif size == 'smol':
