@@ -61,17 +61,17 @@ class PanelDriver(object):
             magnitude = (
                                 (center[0] - coordinate[0]) ** 2 +
                                 (center[1] - coordinate[1]) ** 2
-                        )**(1/2)
+                        ) ** (1 / 2)
 
-            sin_baby = angle/speed_factor
-            hue = math.sin((magnitude**2 + hue**2)/2*(magnitude + sin_baby/hue) + sin_baby)
+            sin_baby = angle / speed_factor
+            hue = math.sin((magnitude ** 2 + hue ** 2) / 2 * (magnitude + sin_baby / hue) + sin_baby)
             # value = math.sin(-(magnitude**2 + value**2)/2*(sin_baby + value) + magnitude/2) * brightness_factor
             value = 1
             rgb = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(hue, saturation, value))
             pixel_list.append(rgb)
         return list(itertools.chain(*pixel_list))
 
-    def crazy_rainbows(self, angle=0., seed=random.random()):
+    def crazy_rainbows(self, angle=0., seed=(random.random() * 50)):
         pixel_list_smol = self.calc_crazy_rainbows(angle, self.pix_map_normlized_smol, seed)
         pixel_list_big = self.calc_crazy_rainbows(angle, self.pix_map_normlized_big, seed)
         return pixel_list_smol, pixel_list_big
@@ -93,7 +93,6 @@ class PanelDriver(object):
             sin_baby = (angle+30)/speed_factor
             hue = math.sin((sin_baby**3 + hue**2)/2 + magnitude)
             value = math.sin((sin_baby**2 + hue**4)/2 - seed + magnitude) * brightness_factor
-            saturation = 0.9 + (math.sin(sin_baby**2 + hue**2))/10
             rgb = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(hue, saturation, value))
             pixel_list.append(rgb)
         return list(itertools.chain(*pixel_list))
