@@ -208,8 +208,7 @@ def main():
     with serial.Serial(
             port=target_device, baudrate=DEFAULT_BAUD, timeout=1
     ) as ser:
-        sesh = TelecortexSession(ser)
-        sesh.reset_board()
+        sesh = conf.setup_session(ser)
 
         while sesh:
             frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % 360
