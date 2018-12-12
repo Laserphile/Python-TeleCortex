@@ -92,6 +92,15 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
     Given a numpy array image and a normalized pixel map showing the position
     of each pixel, return a list of channel values for each pixel in the map,
     so that it can be encoded and send to the server.
+
+    `pix_map_normalized` is a list of coordinates of pixels, normalized means
+    instead of them being coordinates on the frame like (420, 69), they are
+    values from 0.0 to 1.0.
+
+    `itertools.chain` takes a list of lists, and basically flattens that list
+    https://docs.python.org/2/library/itertools.html#itertools.chain .
+
+    This could be optimized by calculating the denormalized coordinates first.
     """
     pixel_list = []
     for pix in pix_map_normalized:
