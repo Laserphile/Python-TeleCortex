@@ -593,6 +593,8 @@ class TelecortexSession(object):
     @property
     def bytes_left(self):
         ser_buff_len = 0
+        if len(self.ack_queue) > self.max_ack_queue:
+            return 0
         for linenum, ack_cmd in self.ack_queue.items():
             if ack_cmd.cmd == "M110":
                 return 0
