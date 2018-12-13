@@ -29,6 +29,7 @@ class TeleCortexConfig(object):
         self.parser.add_argument('--do-crc', default=True)
         self.parser.add_argument('--skip-crc', action='store_false', dest='do_crc')
         self.parser.add_argument('--virtual', action='store_true')
+        self.parser.add_argument('--ignore-acks', action='store_true', default=False)
 
         # self.parser.add_argument('--disable-log-file', action='store_false', dest='enable_log_file')
         self.parser.add_argument(
@@ -129,7 +130,8 @@ class TeleCortexSessionConfig(TeleCortexConfig):
         sesh = session_class(
             ser,
             max_ack_queue=self.args.max_ack_queue,
-            do_crc=self.args.do_crc
+            do_crc=self.args.do_crc,
+            ignore_acks=self.args.ignore_acks
         )
         sesh.reset_board()
         return sesh
