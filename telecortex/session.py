@@ -495,8 +495,12 @@ class TelecortexSession(object):
         #         self.ser.cts, self.ser.dsr, self.ser.rts, self.ser.dtr, self.ser.ri, self.ser.cd
         #     )
         # )
-        while len(byte_array) > (self.chunk_size - self.ser.out_waiting):
-            logging.debug("waiting on write out")
+        while len(byte_array) > (self.ser_buff_size - self.ser.out_waiting):
+            logging.debug("waiting on write out: %d > (%d - %d)" % (
+                len(byte_array),
+                self.chunk_size,
+                self.ser.out_waiting
+            ))
         self.ser.write(byte_array)
         # logging.debug(
         #     "after write | CTS %s, DSR: %s, RTS %s, DTR %s, RI: %s, CD: %s" % (
