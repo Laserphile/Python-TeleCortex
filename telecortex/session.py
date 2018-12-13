@@ -171,8 +171,10 @@ class TelecortexSession(object):
 
     # TODO: group idle debug prints
 
-    chunk_size = 261
-    ser_buff_size = int(1.2 * chunk_size)
+    # chunk_size = 200
+    chunk_size = 1400
+    # ser_buff_size = int(1.2 * chunk_size)
+    ser_buff_size = chunk_size
     serial_class = serial.Serial
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
