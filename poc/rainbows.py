@@ -87,12 +87,12 @@ def main():
                     pixel_list = list(itertools.chain(*pixel_list))
                     pixel_str = pix_array2text(*pixel_list)
                     sesh.chunk_payload_with_linenum("M2601", {"Q":panel}, pixel_str)
+
+                while not sesh.ready:
+                    logging.debug("waiting on queue")
             sesh.send_cmd_with_linenum("M2610")
             frameno = (frameno + 1) % 255
 
-            while not sesh.ready:
-                logging.debug("waiting on queue")
-                time.sleep(0.1)
 
 
 if __name__ == '__main__':
