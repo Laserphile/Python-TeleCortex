@@ -171,10 +171,6 @@ class TelecortexSession(object):
 
     # TODO: group idle debug prints
 
-    # chunk_size = 200
-    chunk_size = 1400
-    # ser_buff_size = int(1.2 * chunk_size)
-    ser_buff_size = chunk_size
     serial_class = serial.Serial
 
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
@@ -207,6 +203,8 @@ class TelecortexSession(object):
         assert isinstance(self.max_ack_queue, six.integer_types)
         self.do_crc = kwargs.get('do_crc', True)
         self.ignore_acks = kwargs.get('ignore_acks', False)
+        self.chunk_size = kwargs.get('chunk_size', 2000)
+        self.ser_buff_size = kwargs.get('ser_buff_size', 10000)
 
     @property
     def lines_avail(self):

@@ -8,12 +8,16 @@ from pprint import pformat, pprint
 import coloredlogs
 from telecortex.mapping import (MAPS_DOME_DJ, MAPS_DOME_OVERHEAD,
                                 MAPS_DOME_SIMPLIFIED, MAPS_DOME_TRIFORCE,
-                                MAPS_GOGGLE, PANELS_DOME_DJ,
+                                MAPS_GOGGLE, MAPS_TRIFORCE, PANELS_DOME_DJ,
                                 PANELS_DOME_OVERHEAD, PANELS_DOME_SIMPLIFIED,
-                                PANELS_DOME_TRIFORCE, PANELS_GOGGLE, MAPS_TRIFORCE, PANELS_TRIFORCE)
+                                PANELS_DOME_TRIFORCE, PANELS_GOGGLE,
+                                PANELS_TRIFORCE)
 from telecortex.session import (SERVERS_DOME, SERVERS_SINGLE,
                                 TelecortexSession, TelecortexSessionManager,
-                                TelecortexVirtualManager, VirtualTelecortexSession, TelecortexThreadManager, TeleCortexVirtualThreadManager)
+                                TelecortexThreadManager,
+                                TelecortexVirtualManager,
+                                TeleCortexVirtualThreadManager,
+                                VirtualTelecortexSession)
 
 
 class TeleCortexConfig(object):
@@ -22,19 +26,30 @@ class TeleCortexConfig(object):
 
         self.parser = argparse.ArgumentParser(description=description)
         self.parser.add_argument('--verbose', '-v', action='count', default=1)
-        self.parser.add_argument('--verbosity', action='store', dest='verbose', type=int)
-        self.parser.add_argument('--quiet', '-q', action='store_const', const=0, dest='verbose')
+        self.parser.add_argument('--verbosity', action='store',
+                                 dest='verbose', type=int)
+        self.parser.add_argument('--quiet', '-q', action='store_const',
+                                 const=0, dest='verbose')
         self.parser.add_argument('--enable-log-file', default=False)
         self.parser.add_argument('--max-ack-queue', default=5, type=int)
         self.parser.add_argument('--do-crc', default=True)
-        self.parser.add_argument('--skip-crc', action='store_false', dest='do_crc')
+        self.parser.add_argument('--skip-crc', action='store_false',
+                                 dest='do_crc')
         self.parser.add_argument('--virtual', action='store_true')
-        self.parser.add_argument('--ignore-acks', action='store_true', default=False)
+        self.parser.add_argument('--ignore-acks', action='store_true',
+                                 default=False)
+        self.parser.add_argument('--chunk-size', default=230, type=int)
+        self.parser.add_argument('--ser-buff-size', default=(230 * 1.2),
+                                 type=int)
 
-        # self.parser.add_argument('--disable-log-file', action='store_false', dest='enable_log_file')
+        # self.parser.add_argument('--disable-log-file', action='store_false',
+        #                          dest='enable_log_file')
         self.parser.add_argument(
             '--config',
-            choices=['dome', 'dome_simplified', 'dome_overhead', 'single', 'goggles', 'triforce'],
+            choices=[
+                'dome', 'dome_simplified', 'dome_overhead', 'single',
+                'goggles', 'triforce'
+            ],
             default=default_config
         )
         self.args = argparse.Namespace()
@@ -131,7 +146,9 @@ class TeleCortexSessionConfig(TeleCortexConfig):
             ser,
             max_ack_queue=self.args.max_ack_queue,
             do_crc=self.args.do_crc,
-            ignore_acks=self.args.ignore_acks
+            ignore_acks=self.args.ignore_acks,
+            chunk_size=self.args.chunk_size,
+            ser_buff_size=self.args.ser_buff_size
         )
         sesh.reset_board()
         return sesh
@@ -152,7 +169,10 @@ class TeleCortexManagerConfig(TeleCortexConfig):
         manager = manager_class(
             self.servers,
             max_ack_queue=self.args.max_ack_queue,
-            do_crc=self.args.do_crc
+            do_crc=self.args.do_crc,
+            ignore_acks=self.args.ignore_acks,
+            chunk_size=self.args.chunk_size,
+            ser_buff_size=self.args.ser_buff_size
         )
         return manager
 
