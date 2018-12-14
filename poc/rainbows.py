@@ -58,42 +58,51 @@ def main():
     else:
         logging.debug("target_device: %s" % target_device)
         logging.debug("baud: %s" % conf.args.serial_baud)
-    # Connect to serial
+    # Frame number used for animations
     frameno = 0
+    # Connect to serial
     with serial.Serial(
         port=target_device, baudrate=conf.args.serial_baud, timeout=1
     ) as ser:
         # logging.debug("settings: %s" % pformat(ser.get_settings()))
+        # Create session object from config and serial connection
         sesh = conf.setup_session(ser)
         while sesh:
-
             # H = frameno, S = 255 (0xff), V = 127 (0x7f)
             logging.debug("Drawing frame %s" % frameno)
             for panel, map_name in conf.panels[0]:
                 if conf.args.do_single:
+                    # Send the M2603 command "set entire strip to this HSV"
                     pixel_str = pix_array2text(
                         frameno, 255, 127
                     )
                     sesh.send_cmd_with_linenum(
                         "M2603", {"Q": panel, "V": pixel_str})
                 else:
+                    # Send the M2601 command "set strip to this string"
                     panel_length = len(conf.maps[map_name])
                     logging.debug(
                         "panel: %s; panel_length: %s" % (panel, panel_length)
                     )
+                    # start off with a list of 3 item long lists (H, S, V)
                     pixel_list = [
                         [(frameno + pixel) % 256, 255, 127]
                         for pixel in range(panel_length)
                     ]
                     logging.debug("pixel_list: %s" % pformat(pixel_list))
+                    # List gets flattened into M2601 format
                     pixel_list = list(itertools.chain(*pixel_list))
                     pixel_str = pix_array2text(*pixel_list)
+                    # Send the pixel data through the session
                     sesh.chunk_payload_with_linenum(
                         "M2601", {"Q": panel}, pixel_str)
 
+                # Wait if session is still sending the data
                 while not sesh.ready:
                     logging.debug("waiting on queue")
+            # M2610 causes strip to display the pixels that have been sent
             sesh.send_cmd_with_linenum("M2610")
+            # increment frame number
             frameno = (frameno + 1) % 255
 
 
