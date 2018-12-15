@@ -30,7 +30,6 @@ from telecortex.mapping import MAPS_DOME, transform_panel_map
 from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexConfig
 
-ENABLE_PREVIEW = False
 
 IMG_SIZE = 128
 MAX_HUE = 1.0
@@ -56,9 +55,13 @@ def main():
 
     conf = TeleCortexConfig(
         name="parallel_linalg",
-        description="draw a single rainbow spanning several telecortex controllers in parallel",
+        description=(
+            "draw a single rainbow spanning several telecortex controllers "
+            "in parallel"),
         default_config='dome_overhead'
     )
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
 
     conf.parse_args()
 
@@ -66,7 +69,7 @@ def main():
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         window_flags = 0
         window_flags |= cv2.WINDOW_NORMAL
         # window_flags |= cv2.WINDOW_AUTOSIZE
@@ -83,7 +86,9 @@ def main():
     start_time = time_now()
 
     while any([manager.threads.get(server_id)[1] for server_id in PANELS]):
-        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+        frameno = (
+            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
+        ) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
         cv2.imshow(MAIN_WINDOW, np.array(img))
@@ -94,11 +99,14 @@ def main():
             for panel_number, size, scale, angle, offset in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
                     if size not in MAPS_DOME:
-                        raise UserWarning('Panel size %s not in known mappings: %s' %(
-                            size, MAPS_DOME.keys()
-                        ))
+                        raise UserWarning(
+                            'Panel size %s not in known mappings: %s' % (
+                                size, MAPS_DOME.keys()
+                            )
+                        )
                     panel_map = MAPS_DOME[size]
-                    panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
+                    panel_map = transform_panel_map(
+                        panel_map, size, scale, angle, offset)
 
                     pixel_map_cache[(server_id, panel_number)] = panel_map
 
@@ -112,7 +120,7 @@ def main():
                 pixel_str = pix_array2text(*pixel_list)
                 manager.chunk_payload_with_linenum(
                     server_id,
-                    "M2600", {"Q":panel_number}, pixel_str
+                    "M2600", {"Q": panel_number}, pixel_str
                 )
 
         if INTERLEAVE:
@@ -129,7 +137,7 @@ def main():
 
                     manager.chunk_payload_with_linenum(
                         server_id,
-                        "M2600", {"Q":panel_number}, pixel_str
+                        "M2600", {"Q": panel_number}, pixel_str
                     )
 
         while not manager.all_idle:
@@ -138,10 +146,10 @@ def main():
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
-
-        if ENABLE_PREVIEW:
+        if conf.args.enable_preview:
             for panel_map in pixel_map_cache.values():
-                draw_map(img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
+                draw_map(
+                    img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
             for panel_map in pixel_map_cache.values():
                 draw_map(img, panel_map, DOT_RADIUS)
             cv2.imshow(MAIN_WINDOW, img)

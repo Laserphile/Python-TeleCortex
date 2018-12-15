@@ -32,7 +32,6 @@ STREAM_LOG_LEVEL = logging.WARN
 
 LOG_FILE = ".sesssion.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = False
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -83,6 +82,9 @@ def main():
         default_config='dome_overhead'
     )
 
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
+
     conf.parse_args()
 
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
@@ -92,7 +94,7 @@ def main():
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         window_flags = 0
         window_flags |= cv2.WINDOW_NORMAL
         # window_flags |= cv2.WINDOW_AUTOSIZE
@@ -137,7 +139,7 @@ def main():
                 )
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
-        if ENABLE_PREVIEW:
+        if conf.args.enable_preview:
             draw_map(img, pix_map_normlized_smol)
             draw_map(img, pix_map_normlized_big, outline=(255, 255, 255))
             cv2.imshow(MAIN_WINDOW, img)

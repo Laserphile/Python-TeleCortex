@@ -26,7 +26,6 @@ from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexManagerConfig
 
-ENABLE_PREVIEW = True
 
 IMG_SIZE = 256
 MAX_HUE = 1.0
@@ -49,9 +48,12 @@ def fill_rainbows(image, angle=0.0):
 def main():
     conf = TeleCortexManagerConfig(
         name="linalg",
-        description="draw a single rainbow spanning several telecortex controllers",
+        description=(
+            "draw a single rainbow spanning several telecortex controllers"),
         default_config='dome_overhead'
     )
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
 
     conf.parse_args()
 
@@ -59,7 +61,7 @@ def main():
 
     img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         window_flags = 0
         window_flags |= cv2.WINDOW_NORMAL
         # window_flags |= cv2.WINDOW_AUTOSIZE
@@ -76,7 +78,9 @@ def main():
     manager = conf.setup_manager()
 
     while any([manager.sessions.get(server_id) for server_id in conf.panels]):
-        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+        frameno = (
+            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
+        ) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
         for server_id, server_panel_info in conf.panels.items():
@@ -96,9 +100,9 @@ def main():
             # import pudb; pudb.set_trace()
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
-        if ENABLE_PREVIEW:
+        if conf.args.enable_preview:
             for map_name, mapping in conf.maps.items():
-                draw_map(img, mapping, DOT_RADIUS+1, outline=(255, 255, 255))
+                draw_map(img, mapping, DOT_RADIUS + 1, outline=(255, 255, 255))
             for map_name, mapping in conf.maps.items():
                 draw_map(img, mapping, DOT_RADIUS)
             cv2.imshow(MAIN_WINDOW, img)

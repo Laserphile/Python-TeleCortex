@@ -30,7 +30,6 @@ from telecortex.util import pix_array2text
 from telecortex.mapping import MAPS_DOME, transform_panel_map
 from telecortex.config import TeleCortexConfig
 
-ENABLE_PREVIEW = True
 
 IMG_SIZE = 128
 MAX_HUE = 1.0
@@ -48,9 +47,14 @@ def main():
 
     conf = TeleCortexConfig(
         name="parallel_video",
-        description="draw a video file spanning several telecortex controllers in parallel",
+        description=(
+            "draw a video file spanning several telecortex controllers in "
+            "parallel"),
         default_config='dome_overhead'
     )
+
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
 
     conf.parse_args()
 
@@ -59,7 +63,7 @@ def main():
     cap = cv2.VideoCapture(VIDEO_FILE)
     ret, img = cap.read()
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         window_flags = 0
         window_flags |= cv2.WINDOW_NORMAL
         # window_flags |= cv2.WINDOW_AUTOSIZE
@@ -103,7 +107,7 @@ def main():
                 pixel_str = pix_array2text(*pixel_list)
                 manager.chunk_payload_with_linenum(
                     server_id,
-                    "M2600", {"Q":panel_number}, pixel_str
+                    "M2600", {"Q": panel_number}, pixel_str
                 )
 
         if INTERLEAVE:
@@ -120,7 +124,7 @@ def main():
 
                     manager.chunk_payload_with_linenum(
                         server_id,
-                        "M2600", {"Q":panel_number}, pixel_str
+                        "M2600", {"Q": panel_number}, pixel_str
                     )
 
         while not manager.all_idle:
@@ -129,8 +133,7 @@ def main():
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
-
-        if ENABLE_PREVIEW:
+        if conf.args.enable_preview:
             for panel_map in pixel_map_cache.values():
                 draw_map(img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
             for panel_map in pixel_map_cache.values():

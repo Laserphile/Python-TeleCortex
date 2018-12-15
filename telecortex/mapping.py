@@ -505,10 +505,13 @@ def generate_panel_maps(generator):
             maps[map_name] = panel_map
     return maps, panels
 
+
 MAPS_DOME_OVERHEAD, PANELS_DOME_OVERHEAD = generate_panel_maps(GENERATOR_DOME_OVERHEAD)
 MAPS_DOME_DJ, PANELS_DOME_DJ = generate_panel_maps(GENERATOR_DOME_DJ)
 MAPS_DOME_TRIFORCE, PANELS_DOME_TRIFORCE = generate_panel_maps(GENERATOR_DOME_TRIFORCE)
 MAPS_TRIFORCE, PANELS_TRIFORCE = generate_panel_maps(GENERATOR_TRIFORCE)
+
+PANELS_PER_CONTROLLER = 4
 
 def draw_map(image, pix_map_normlized, radius=1, outline=None):
     """Given an image and a normalized pixel map, draw the map on the image."""

@@ -36,7 +36,6 @@ MAX_HUE = 360
 
 LOG_FILE = ".interpolate.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
@@ -180,6 +179,9 @@ def main():
     )
     conf.parser.add_argument('--serial-dev',)
 
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
+
     conf.parse_args()
 
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
@@ -198,7 +200,7 @@ def main():
 
     test_img = Image.new('RGB', (IMG_SIZE, IMG_SIZE))
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         tk_root = tk.Tk()
         tk_img = ImageTk.PhotoImage(test_img)
         tk_panel = tk.Label(tk_root, image=tk_img)
@@ -229,7 +231,7 @@ def main():
                     sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str_smol)
             sesh.send_cmd_with_linenum("M2610")
 
-            if ENABLE_PREVIEW:
+            if conf.args.enable_preview:
                 draw_map(test_img, pix_map_normlized_smol)
                 draw_map(test_img, pix_map_normlized_big, outline=(255, 255, 255))
                 tk_img = ImageTk.PhotoImage(test_img)

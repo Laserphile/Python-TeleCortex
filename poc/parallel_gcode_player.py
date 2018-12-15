@@ -26,7 +26,6 @@ from telecortex.session import SERVERS_BLANK as SERVERS
 from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexConfig
 
-ENABLE_PREVIEW = True
 
 IMG_SIZE = 128
 MAX_HUE = 1.0

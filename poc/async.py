@@ -23,7 +23,6 @@ STREAM_LOG_LEVEL = logging.DEBUG
 
 LOG_FILE = ".parallel.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)

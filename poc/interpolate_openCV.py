@@ -30,8 +30,6 @@ IMG_SIZE = 64
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 
-ENABLE_PREVIEW = True
-
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 10
 MAIN_WINDOW = 'image_window'
@@ -77,6 +75,8 @@ def main():
 
     conf.parser.add_argument('--serial-dev',)
     conf.parser.add_argument('--serial-baud', default=DEFAULT_BAUD)
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
 
     conf.parse_args()
 
@@ -94,7 +94,7 @@ def main():
     # test_img = cv2.imread('/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg', cv2.IMREAD_COLOR)
     test_img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         window_flags = 0
         window_flags |= cv2.WINDOW_NORMAL
         # window_flags |= cv2.WINDOW_AUTOSIZE
@@ -139,7 +139,7 @@ def main():
                 sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str)
             sesh.send_cmd_with_linenum("M2610")
 
-            if ENABLE_PREVIEW:
+            if conf.args.enable_preview:
                 draw_map(test_img, MAPS_DOME['smol'])
                 draw_map(test_img, MAPS_DOME['big'], outline=(255, 255, 255))
                 cv2.imshow(MAIN_WINDOW, test_img)

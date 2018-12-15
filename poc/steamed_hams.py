@@ -23,9 +23,6 @@ from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexManagerConfig
 
-IMG_SIZE = 64
-
-ENABLE_PREVIEW = True
 
 TARGET_FRAMERATE = 20
 MAIN_WINDOW = 'image_window'
@@ -52,6 +49,9 @@ def main():
         default_config='dome_overhead'
     )
 
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
+
     conf.parse_args()
 
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
@@ -60,7 +60,7 @@ def main():
 
     img = np.array(sct.grab(MON))
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         window_flags = 0
         window_flags |= cv2.WINDOW_NORMAL
         # window_flags |= cv2.WINDOW_AUTOSIZE
@@ -96,7 +96,7 @@ def main():
                 )
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
-        if ENABLE_PREVIEW:
+        if conf.args.enable_preview:
             for map_name, mapping in conf.maps.items():
                 draw_map(img, mapping, DOT_RADIUS+1, outline=(255, 255, 255))
             for map_name, mapping in conf.maps.items():

@@ -21,7 +21,7 @@ from telecortex.mapping import MAPS_DOME, draw_map, transform_panel_map
 from telecortex.session import TelecortexThreadManager
 from telecortex.util import pix_array2text
 
-ENABLE_PREVIEW = True
+conf.args.enable_preview = True
 
 IMG_SIZE = 256
 MAX_HUE = 1.0
@@ -38,9 +38,14 @@ MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
 def main():
     conf = TeleCortexConfig(
         name="parallel_hams",
-        description="take the output of the screen and draw on several telecortex controllers in parallel",
+        description=(
+            "take the output of the screen and draw on several telecortex "
+            "controllers in parallel"),
         default_config='dome_overhead'
     )
+
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
 
     conf.parse_args()
 
@@ -50,7 +55,7 @@ def main():
 
     img = np.array(sct.grab(MON))
 
-    if ENABLE_PREVIEW:
+    if conf.args.enable_preview:
         window_flags = 0
         window_flags |= cv2.WINDOW_NORMAL
         # window_flags |= cv2.WINDOW_AUTOSIZE
@@ -106,7 +111,7 @@ def main():
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
-        if ENABLE_PREVIEW:
+        if conf.args.enable_preview:
             for panel_map in pixel_map_cache.values():
                 draw_map(img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
             for panel_map in pixel_map_cache.values():
