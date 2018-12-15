@@ -71,7 +71,7 @@ def main():
 
     manager = conf.setup_manager()
 
-    while manager.any_alive:
+    while manager:
         frameno = (
             (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
         ) % MAX_ANGLE
