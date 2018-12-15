@@ -691,7 +691,6 @@ class TeleCortexBaseManager(object):
             if 'pid' in dev_kwargs:
                 del dev_kwargs['pid']
 
-
         ports = query_serial_dev(**dev_kwargs)
 
 
@@ -748,7 +747,7 @@ class TeleCortexBaseManager(object):
 class TelecortexSessionManager(TeleCortexBaseManager):
 
     def __init__(self, servers, **kwargs):
-        super(TelecortexSessionManager, self).__init__(servers)
+        super(TelecortexSessionManager, self).__init__(servers, **kwargs)
         self.sessions = OrderedDict()
         self.refresh_connections()
 
