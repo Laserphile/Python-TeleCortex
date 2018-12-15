@@ -67,7 +67,7 @@ def main():
                 server_id,
                 cmd, args, payload
             )
-            # TODO: manager.wait_for_workers()
+            # TODO: manager.wait_for_workers_idle()
 
             while not manager.all_idle:
                 logging.debug("waiting on queue")

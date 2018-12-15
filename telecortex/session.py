@@ -7,6 +7,7 @@ import os
 import sys
 import re
 import time
+from time import time as time_now
 from collections import OrderedDict, deque
 from datetime import datetime
 from pprint import pformat, pprint
@@ -252,7 +253,12 @@ class TelecortexSession(object):
 
     def send_cmd_obj(self, cmd_obj):
         full_cmd = cmd_obj.fmt(checksum=self.do_crc)
-        while self.lines_avail or self.bytes_left < len(full_cmd):
+        while any([
+            self.lines_avail,
+            self.bytes_left < len(full_cmd),
+            # self.last_idle - time_now() > 1,
+            # self.last_loo_rate - time_now() > 1
+        ]):
             self.parse_responses()
         cmd_obj.bytes_occupied = self.write_line(full_cmd)
         self.last_cmd = cmd_obj
@@ -286,7 +292,8 @@ class TelecortexSession(object):
             self.get_line()
 
     def reset_board(self):
-
+        self.last_idle = time_now()
+        self.last_loo_rate = time_now()
         self.ser.reset_output_buffer()
         self.send_cmd_without_linenum("M9999")
         self.flush_in()
@@ -495,14 +502,16 @@ class TelecortexSession(object):
         #     )
         # )
         while len(byte_array) > (self.ser_buff_size - self.ser.out_waiting):
-            # TODO: relinquish control to other threads here
-            time.sleep(0.001)
             logging.debug("waiting on write out: %d > (%d - %d)" % (
                 len(byte_array),
                 self.chunk_size,
                 self.ser.out_waiting
             ))
+            # TODO: relinquish control to other threads here
+            # time.sleep(0.01)
         self.ser.write(byte_array)
+        # TODO: relinquish control to other threads here
+        # time.sleep(0.005)
         # logging.debug(
         #     "after write | CTS %s, DSR: %s, RTS %s, DTR %s, RI: %s, CD: %s" % (
         #         self.ser.cts, self.ser.dsr, self.ser.rts, self.ser.dtr, self.ser.ri, self.ser.cd
@@ -531,6 +540,7 @@ class TelecortexSession(object):
             self.idles_recvd += 1
         elif line.startswith(";"):
             if re.match(self.re_loo_rates, line):
+                self.last_loo_rate = time_now()
                 match = re.search(self.re_loo_rates, line).groupdict()
                 pix_rate = int(match.get('pix_rate'))
                 cmd_rate = int(match.get('cmd_rate'))
@@ -587,30 +597,31 @@ class TelecortexSession(object):
         if self.idles_recvd > 0:
             logging.info('Idle received x %s' % self.idles_recvd)
         if self.action_idle and self.idles_recvd:
+            self.last_idle = time_now()
             self.clear_ack_queue()
         # else:
         #     logging.debug("did not recieve IDLE")
 
     @property
     def bytes_left(self):
-        ser_buff_len = 0
-        if len(self.ack_queue) > self.max_ack_queue:
+        ser_buff_len = self.ser.out_waiting
+        if not self.ignore_acks and len(self.ack_queue) > self.max_ack_queue:
             return 0
-        for linenum, ack_cmd in self.ack_queue.items():
-            if ack_cmd.cmd == "M110":
-                return 0
-            ser_buff_len += ack_cmd.bytes_occupied
-            if ser_buff_len > self.ser_buff_size:
-                return 0
+        if self.ignore_acks:
+            for linenum, ack_cmd in self.ack_queue.items():
+                if ack_cmd.cmd == "M110":
+                    return 0
+                ser_buff_len += ack_cmd.bytes_occupied
+                if ser_buff_len > self.ser_buff_size:
+                    return 0
         return self.ser_buff_size - ser_buff_len
 
     @property
     def ready(self):
-        if self.ignore_acks:
-            return True
-        if len(self.ack_queue) > self.max_ack_queue:
+        if self.ser.out_waiting >= self.ser_buff_size:
             return False
-
+        if not self.ignore_acks and len(self.ack_queue) >= self.max_ack_queue:
+            return False
         return True
 
     def __nonzero__(self):
@@ -823,13 +834,15 @@ class TelecortexVirtualManager(TelecortexSessionManager, TelecortexVirtualManage
 
 class TelecortexThreadManager(TeleCortexBaseManager):
 
+    queue_length = 10
+
     def __init__(self, servers, **kwargs):
         super(TelecortexThreadManager, self).__init__(servers, **kwargs)
         self.threads = OrderedDict()
         self.refresh_connections()
 
     @classmethod
-    def controller_thread(cls, serial_conf, queue, session_kwargs):
+    def controller_thread(cls, serial_conf, queue_, session_kwargs):
         # setup serial device
         ser = cls.serial_class(
             port=serial_conf['file'],
@@ -846,9 +859,14 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         # listen for commands
         while sesh:
             try:
-                cmd, args, payload = queue.get(timeout=0.001)
+                cmd, args, payload = queue_.get_nowait()
+            except queue.Empty as exc:
+                logging.info("Queue Empty: %s | %s" % (sesh.cid, exc))
+                # TODO: relinquish control to other threads
+                time.sleep(0.01)
+                continue
             except Exception as exc:
-                # logging.error(exc)
+                logging.error(exc)
                 continue
             # logging.debug("received: %s" % str((cmd, args, payload)))
             sesh.chunk_payload_with_linenum(cmd, args, payload)
@@ -873,7 +891,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             serial_conf = self.get_serial_conf(server_info)
 
             if serial_conf:
-                queue = mp.Queue(10)
+                queue = mp.Queue(self.queue_length)
 
                 proc = ctx.Process(
                     target=self.controller_thread,
@@ -894,10 +912,28 @@ class TelecortexThreadManager(TeleCortexBaseManager):
     def all_idle(self):
         return all([queue.empty() for (queue, proc) in self.threads.values()])
 
-    def wait_for_workers(self):
+    # @property
+    # def queue_sizes(self):
+    #     return [
+    #         queue.qsize() for (queue, proc) in self.threads.values()
+    #     ]
+
+    # @property
+    # def any_almost_full(self):
+    #     return any([
+    #         self.queue_length - queue.qsize() < 1
+    #         for (queue, proc) in self.threads.values()
+    #     ])
+
+    def wait_for_workers_idle(self):
         while not self.all_idle:
-            logging.debug("waiting on queue")
-            time.sleep(0.02)
+            logging.debug("waiting on queue idle")
+            time.sleep(0.01)
+
+    # def wait_for_workers_not_almost_full(self):
+    #     while self.any_almost_full:
+    #         logging.debug("waiting on queue not almost full")
+    #         time.sleep(0.05)
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
         loops = 0
@@ -905,11 +941,20 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         while True:
             loops += 1
             if loops > 1000:
-                raise UserWarning("too many retries: %s, %s" % (loops,map(str, [server_id, cmd, args, payload])) )
+                raise UserWarning(
+                    "too many retries: %s, %s" % (
+                        loops, map(str, [server_id, cmd, args, payload])
+                    )
+                )
             try:
-                self.threads[server_id][0].put((cmd, args, payload), timeout=0.01)
-            except queue.Full:
-                continue
+                self.threads[server_id][0].put(
+                    (cmd, args, payload),
+                    timeout=0
+                )
+            except queue.Full as exc:
+                logging.debug("Queue Full: %d | %s" % (server_id, exc))
+                # TODO: relinquish control to other threads
+                time.sleep(0.01)
             except OSError as exc:
                 logging.error("OSError: %s" % exc)
                 self.refresh_connections([server_id])

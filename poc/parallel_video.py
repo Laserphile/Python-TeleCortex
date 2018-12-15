@@ -115,7 +115,7 @@ def main():
                         "M2600", {"Q": panel_number}, pixel_str
                     )
 
-        manager.wait_for_workers()
+        manager.wait_for_workers_idle()
 
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
