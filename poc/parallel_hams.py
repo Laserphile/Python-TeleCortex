@@ -13,16 +13,12 @@ import cv2
 import numpy as np
 from context import telecortex
 from mss import mss
-from telecortex.config import TeleCortexConfig
+from telecortex.config import TeleCortexThreadManagerConfig
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
-from telecortex.mapping import MAPS_DOME, draw_map, transform_panel_map
-from telecortex.session import TelecortexThreadManager
+from telecortex.mapping import draw_map, transform_panel_map
 from telecortex.util import pix_array2text
 
-
 TARGET_FRAMERATE = 20
-ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
@@ -31,7 +27,7 @@ DOT_RADIUS = 3
 MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
 
 def main():
-    conf = TeleCortexConfig(
+    conf = TeleCortexThreadManagerConfig(
         name="parallel_hams",
         description=(
             "take the output of the screen and draw on several telecortex "
@@ -44,7 +40,7 @@ def main():
 
     conf.parse_args()
 
-    manager = TelecortexThreadManager(conf.servers)
+    manager = conf.setup_manager()
 
     sct = mss()
 
@@ -66,23 +62,24 @@ def main():
 
     start_time = time_now()
 
-    while any([manager.threads.get(server_id, (None, None))[1] for server_id in PANELS]):
+    while manager.any_alive:
 
         img = np.array(sct.grab(MON))
 
         cv2.imshow(MAIN_WINDOW, np.array(img))
 
-        for server_id, server_panel_info in PANELS.items():
+        for server_id, server_panel_info in conf.panels.items():
             if not manager.threads.get(server_id):
                 continue
-            for panel_number, size, scale, angle, offset in server_panel_info:
+            for panel_number, map_name in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if size not in MAPS_DOME:
-                        raise UserWarning('Panel size %s not in known mappings: %s' %(
-                            size, MAPS_DOME.keys()
-                        ))
-                    panel_map = MAPS_DOME[size]
-                    panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
+                    if map_name not in conf.maps:
+                        raise UserWarning(
+                            'Panel map_name %s not in known mappings: %s' % (
+                                map_name, conf.maps.keys()
+                            )
+                        )
+                    panel_map = conf.maps[map_name]
 
                     pixel_map_cache[(server_id, panel_number)] = panel_map
                 else:
@@ -93,11 +90,9 @@ def main():
                 )
                 pixel_str = pix_array2text(*pixel_list)
 
-                # logging.debug("sending panel %s pixel str %s" % (panel_number, pixel_str))
-
                 manager.chunk_payload_with_linenum(
                     server_id,
-                    "M2600", {"Q":panel_number}, pixel_str
+                    "M2600", {"Q": panel_number}, pixel_str
                 )
 
         while not manager.all_idle:
@@ -108,7 +103,8 @@ def main():
 
         if conf.args.enable_preview:
             for panel_map in pixel_map_cache.values():
-                draw_map(img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
+                draw_map(
+                    img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
             for panel_map in pixel_map_cache.values():
                 draw_map(img, panel_map, DOT_RADIUS)
             cv2.imshow(MAIN_WINDOW, img)

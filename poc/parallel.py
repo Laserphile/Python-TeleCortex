@@ -25,7 +25,7 @@ from telecortex.mapping import (draw_map, normalize_pix_map, rotate_mapping,
                                 transpose_mapping)
 from telecortex.session import TelecortexSession, TelecortexThreadManager
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexConfig
+from telecortex.config import TeleCortexThreadManagerConfig
 
 MAX_HUE = 1.0
 MAX_ANGLE = 360
@@ -55,9 +55,10 @@ def direct_rainbows(pix_map, angle=0.):
 
 def main():
 
-    conf = TeleCortexConfig(
+    conf = TeleCortexThreadManagerConfig(
         name="parallel",
-        description="send rainbows to several telecortex controllers in parallel",
+        description=(
+            "send rainbows to several telecortex controllers in parallel"),
         default_config='dome_simplified'
     )
 
@@ -65,12 +66,14 @@ def main():
 
     conf.parser.print_help()
 
-    manager = TelecortexThreadManager(conf.servers)
+    manager = conf.setup_manager()
 
     start_time = time_now()
 
-    while manager:
-        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+    while manager.any_alive:
+        frameno = (
+            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
+        ) % MAX_ANGLE
 
         pixel_strs = OrderedDict()
 
@@ -80,24 +83,31 @@ def main():
 
         for server_id, server_panel_info in conf.panels.items():
             if not manager.threads.get(server_id):
-                logging.debug("server id %s not found in manager threads: %s" % (
-                    server_id, manager.threads.keys(),
-                ))
+                logging.debug(
+                    "server id %s not found in manager threads: %s" % (
+                        server_id, manager.threads.keys(),
+                    )
+                )
                 continue
             for panel_number, size in server_panel_info:
                 assert size in pixel_strs, \
-                    "Your panel configuration specifies a size %s but your map configuration does not contain a matching entry, only %s" % (
+                    (
+                        "Your panel configuration specifies a size %s but your"
+                        " map configuration does not contain a matching "
+                        "entry, only %s"
+                    ) % (
                         size, conf.maps.keys()
                     )
                 pixel_str = pixel_strs.get(size)
-                # if not pixel_str:
-                #     logging.warning("empty pixel_str generated: %s" % pixel_str)
+                if not pixel_str:
+                    logging.warning(
+                        "empty pixel_str generated: %s" % pixel_str)
                 # else:
                 #     logging.debug("pixel_str: %s" % pformat(pixel_str))
 
                 manager.chunk_payload_with_linenum(
                     server_id,
-                    "M2600", {"Q":panel_number}, pixel_str
+                    "M2600", {"Q": panel_number}, pixel_str
                 )
 
         while not manager.all_idle:

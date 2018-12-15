@@ -176,6 +176,6 @@ class TeleCortexManagerConfig(TeleCortexConfig):
         )
         return manager
 
-class TeleCortexThreadManagerConfic(TeleCortexManagerConfig):
+class TeleCortexThreadManagerConfig(TeleCortexManagerConfig):
     real_manager_class = TelecortexThreadManager
     virtual_manager_class = TeleCortexVirtualThreadManager

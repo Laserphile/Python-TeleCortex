@@ -827,7 +827,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         self.refresh_connections()
 
     @classmethod
-    def controller_thread(cls, serial_conf, queue):
+    def controller_thread(cls, serial_conf, queue, session_kwargs):
         # setup serial device
         ser = cls.serial_class(
             port=serial_conf['file'],
@@ -838,7 +838,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             # dsrdtr=True
         )
         logging.debug("setting up serial sesh: %s" % ser)
-        sesh = cls.session_class(ser)
+        sesh = cls.session_class(ser, **session_kwargs)
         sesh.reset_board()
         sesh.get_cid()
         # listen for commands
@@ -871,7 +871,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
                 proc = ctx.Process(
                     target=self.controller_thread,
-                    args=(serial_conf, queue),
+                    args=(serial_conf, queue, self.session_kwargs),
                     name="controller_%s" % server_id
                 )
                 proc.start()
@@ -983,12 +983,17 @@ SERVERS_DOME = OrderedDict([
 # ])
 
 SERVERS_SINGLE = OrderedDict([
-    (0, {'vid': TEENSY_VID, 'pid': 0x0483, 'baud': DEFAULT_BAUD, 'timeout': DEFAULT_TIMEOUT})
     # (0, {
-    #     'file': '/dev/cu.usbmodem3176931',
+    #     'vid': TEENSY_VID,
+    #     'pid': 0x0483,
     #     'baud': DEFAULT_BAUD,
     #     'timeout': DEFAULT_TIMEOUT
-    # }),
+    # })
+    (0, {
+        'file': '/dev/tty.usbmodem3176940',
+        'baud': DEFAULT_BAUD,
+        'timeout': DEFAULT_TIMEOUT
+    }),
 ])
 
 SERVERS_BLANK = OrderedDict([

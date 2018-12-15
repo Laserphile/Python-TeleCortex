@@ -73,7 +73,7 @@ def main():
 
     manager = conf.setup_manager()
 
-    while any([manager.sessions.get(server_id) for server_id in conf.panels]):
+    while manager.any_alive:
         frameno = (
             (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
         ) % MAX_ANGLE

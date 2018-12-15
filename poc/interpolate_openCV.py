@@ -18,11 +18,12 @@ from context import telecortex
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import MAPS_DOME, MAPS_GOGGLE
+from telecortex.mapping import MAPS_DOME, MAPS_GOGGLE, draw_map
 from telecortex.session import (DEFAULT_BAUD, TEENSY_VID, TelecortexSession,
                                 find_serial_dev)
 from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexSessionConfig
+from telecortex.graphics import fill_rainbows, MAX_ANGLE
 
 
 TARGET_FRAMERATE = 20

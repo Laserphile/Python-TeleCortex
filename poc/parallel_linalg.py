@@ -1,5 +1,4 @@
 
-import colorsys
 import itertools
 import logging
 import multiprocessing as mp
@@ -16,24 +15,12 @@ import cv2
 import numpy as np
 from context import telecortex
 from mss import mss
+from telecortex.config import TeleCortexThreadManagerConfig
+from telecortex.graphics import MAX_ANGLE, fill_rainbows
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER,
-                                draw_map, normalize_pix_map, rotate_mapping,
-                                rotate_vector, scale_mapping,
-                                transpose_mapping)
-from telecortex.session import (DEFAULT_BAUD, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession,
-                                TelecortexSessionManager,
-                                TelecortexThreadManager)
-from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
-from telecortex.mapping import MAPS_DOME, transform_panel_map
+from telecortex.mapping import PANELS_PER_CONTROLLER, draw_map
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexConfig
 
-
-IMG_SIZE = 128
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 2
 MAIN_WINDOW = 'image_window'
@@ -43,17 +30,10 @@ DOT_RADIUS = 1
 INTERLEAVE = False
 
 
-def fill_rainbows(image, angle=0.0):
-    for col in range(IMG_SIZE):
-        hue = (col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE ) % MAX_HUE
-        rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-        # logging.debug("rgb: %s" % (rgb,))
-        cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
-    return image
-
 def main():
+    telecortex.graphics.IMG_SIZE = 128
 
-    conf = TeleCortexConfig(
+    conf = TeleCortexThreadManagerConfig(
         name="parallel_linalg",
         description=(
             "draw a single rainbow spanning several telecortex controllers "
@@ -65,9 +45,11 @@ def main():
 
     conf.parse_args()
 
-    manager = TelecortexThreadManager(conf.servers)
+    manager = conf.setup_manager()
 
-    img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    img = np.ndarray(
+        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
+        dtype=np.uint8)
 
     if conf.args.enable_preview:
         window_flags = 0
@@ -85,7 +67,7 @@ def main():
 
     start_time = time_now()
 
-    while any([manager.threads.get(server_id)[1] for server_id in PANELS]):
+    while manager.any_alive:
         frameno = (
             (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
         ) % MAX_ANGLE
@@ -93,20 +75,18 @@ def main():
 
         cv2.imshow(MAIN_WINDOW, np.array(img))
 
-        for server_id, server_panel_info in PANELS.items():
+        for server_id, server_panel_info in conf.panels.items():
             if not manager.threads.get(server_id):
                 continue
-            for panel_number, size, scale, angle, offset in server_panel_info:
+            for panel_number, map_name in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if size not in MAPS_DOME:
+                    if map_name not in conf.maps:
                         raise UserWarning(
-                            'Panel size %s not in known mappings: %s' % (
-                                size, MAPS_DOME.keys()
+                            'Panel map_name %s not in known mappings: %s' % (
+                                map_name, conf.maps.keys()
                             )
                         )
-                    panel_map = MAPS_DOME[size]
-                    panel_map = transform_panel_map(
-                        panel_map, size, scale, angle, offset)
+                    panel_map = conf.maps[map_name]
 
                     pixel_map_cache[(server_id, panel_number)] = panel_map
 
@@ -125,7 +105,7 @@ def main():
 
         if INTERLEAVE:
             for panel_number in range(PANELS_PER_CONTROLLER):
-                for server_id in PANELS.keys():
+                for server_id in conf.panels.keys():
                     panel_map = pixel_map_cache.get((server_id, panel_number))
                     if not panel_map:
                         continue

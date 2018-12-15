@@ -64,7 +64,7 @@ def main():
     with serial.Serial(
         port=target_device, baudrate=conf.args.serial_baud, timeout=1
     ) as ser:
-        # logging.debug("settings: %s" % pformat(ser.get_settings()))
+        # logging.debug("serial settings: %s" % pformat(ser.get_settings()))
         # Create session object from config and serial connection
         sesh = conf.setup_session(ser)
         while sesh:

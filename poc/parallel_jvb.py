@@ -10,10 +10,9 @@ import coloredlogs
 from cortex_drivers import PanelDriver
 # noinspection PyUnresolvedReferences
 from context import telecortex
-from telecortex.session import (TelecortexThreadManager)
 from telecortex.mapping import (normalize_pix_map, MAPS_DOME_SIMPLIFIED)
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexThreadManagerConfic
+from telecortex.config import TeleCortexThreadManagerConfig
 
 IMG_SIZE = 256
 MAX_HUE = 1.0
@@ -44,7 +43,7 @@ def direct_rainbows(pix_map, angle=0.):
     return pixel_list
 
 def main():
-    conf = TeleCortexThreadManagerConfic(
+    conf = TeleCortexThreadManagerConfig(
         name="parallel_jvb",
         description="send fucked up rainbow circles to several telecortex controllers in parallel",
         default_config='dome_simplified'
@@ -64,7 +63,7 @@ def main():
 
     manager = conf.setup_manager()
 
-    while manager:
+    while manager.any_alive:
         frameno += 1
         if frameno > 2 ** 16 or (start_time - time_now() > five_minutes):
             frameno = 0
