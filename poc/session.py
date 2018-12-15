@@ -16,13 +16,14 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
+from telecortex.config import TeleCortexManagerConfig
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
-                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping, draw_map)
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
+                                normalize_pix_map, rotate_mapping,
+                                rotate_vector, scale_mapping,
+                                transpose_mapping)
 from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexManagerConfig
 
 # STREAM_LOG_LEVEL = logging.DEBUG
 # STREAM_LOG_LEVEL = logging.INFO
@@ -57,51 +58,28 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
-PANELS = OrderedDict([
-    (0, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (1, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (2, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (3, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ]),
-    (4, [
-        # (0, 'big'),
-        (1, 'smol'),
-        # (2, 'smol'),
-        # (3, 'smol')
-    ])
-])
 
 def fill_rainbows(image, angle=0.0):
+    """
+    Given an openCV image, fill with ranbows.
+
+    - `angle` is the hue offset
+    """
     for col in range(IMG_SIZE):
-        hue = (col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE ) % MAX_HUE
+        hue = (
+            col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE
+        ) % MAX_HUE
         rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
         # logging.debug("rgb: %s" % (rgb,))
         cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
     return image
 
+
 def main():
     conf = TeleCortexManagerConfig(
         name="session",
-        description="draw a single rainbow spanning onto telecortex controllers",
+        description=(
+            "draw a single rainbow spanning onto telecortex controllers"),
         default_config='dome_overhead'
     )
 
@@ -132,7 +110,9 @@ def main():
     manager = conf.setup_manager()
 
     while any([manager.sessions.get(server_id) for server_id in conf.panels]):
-        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+        frameno = (
+            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
+        ) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
         pixel_list_smol = interpolate_pixel_map(
