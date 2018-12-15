@@ -19,12 +19,11 @@ from context import telecortex
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import MAPS_DOME
-from telecortex.session import (PANEL_LENGTHS, PANELS, DEFAULT_BAUD,
-                                TEENSY_VID, TelecortexSession,
+from telecortex.mapping import MAPS_DOME, MAPS_GOGGLE
+from telecortex.session import (DEFAULT_BAUD, TEENSY_VID, TelecortexSession,
                                 find_serial_dev)
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexConfig
+from telecortex.config import TeleCortexSessionConfig
 
 
 IMG_SIZE = 64
@@ -33,7 +32,6 @@ MAX_ANGLE = 360
 
 ENABLE_PREVIEW = True
 
-TELECORTEX_DEV = "/dev/tty.usbmodem35"
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 10
 MAIN_WINDOW = 'image_window'
@@ -71,13 +69,14 @@ def main():
     Rend some perpendicular rainbowz
     Respond to microcontroller
     """
-    conf = TeleCortexConfig(
+    conf = TeleCortexSessionConfig(
         name="interpolate_opencv",
         description="draw interpolated maps using opencv",
         default_config='dome_overhead'
     )
 
     conf.parser.add_argument('--serial-dev',)
+    conf.parser.add_argument('--serial-baud', default=DEFAULT_BAUD)
 
     conf.parse_args()
 
@@ -90,7 +89,7 @@ def main():
         raise UserWarning("target device not found")
     else:
         logging.debug("target_device: %s" % target_device)
-        logging.debug("baud: %s" % DEFAULT_BAUD)
+        logging.debug("baud: %s" % conf.args.serial_baud)
 
     # test_img = cv2.imread('/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg', cv2.IMREAD_COLOR)
     test_img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
@@ -115,20 +114,29 @@ def main():
             frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
             fill_rainbows(test_img, frameno)
 
-            pixel_list_smol = interpolate_pixel_map(
-                test_img, MAPS_DOME['smol'], INTERPOLATION_TYPE
-            )
-            pixel_list_big = interpolate_pixel_map(
-                test_img, MAPS_DOME['big'], INTERPOLATION_TYPE
-            )
-            pixel_str_smol = pix_array2text(*pixel_list_smol)
-            pixel_str_big = pix_array2text(*pixel_list_big)
-            for panel in range(PANELS):
-                # import pudb; pudb.set_trace()
-                if PANEL_LENGTHS[panel] == max(PANEL_LENGTHS):
-                    sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str_big)
-                if PANEL_LENGTHS[panel] == min(PANEL_LENGTHS):
-                    sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str_smol)
+            if conf.args.config == 'goggles':
+                pixel_list_goggle = interpolate_pixel_map(
+                    test_img, MAPS_GOGGLE['goggle'], INTERPOLATION_TYPE
+                )
+                pixel_str_goggle = pix_array2text(*pixel_list_goggle)
+            else:
+                pixel_list_smol = interpolate_pixel_map(
+                    test_img, MAPS_DOME['smol'], INTERPOLATION_TYPE
+                )
+                pixel_list_big = interpolate_pixel_map(
+                    test_img, MAPS_DOME['big'], INTERPOLATION_TYPE
+                )
+
+                pixel_str_smol = pix_array2text(*pixel_list_smol)
+                pixel_str_big = pix_array2text(*pixel_list_big)
+            for panel, map_name in conf.panels[0]:
+                if map_name.startswith('big'):
+                    pixel_str = pixel_str_big
+                elif map_name.startswith('smol'):
+                    pixel_str = pixel_str_smol
+                elif map_name.startswith('goggle'):
+                    pixel_str = pixel_str_goggle
+                sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str)
             sesh.send_cmd_with_linenum("M2610")
 
             if ENABLE_PREVIEW:
