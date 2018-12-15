@@ -15,7 +15,7 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
-from telecortex.graphics import MAX_ANGLE, fill_rainbows
+from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PANELS, PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
                                 draw_map, normalize_pix_map, rotate_mapping,
@@ -65,9 +65,7 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    img = np.ndarray(
-        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
-        dtype=np.uint8)
+    img = get_square_canvas()
 
     if ENABLE_PREVIEW:
         window_flags = 0

@@ -17,14 +17,13 @@ import numpy as np
 from context import telecortex
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
+from telecortex.config import TeleCortexSessionConfig
+from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import MAPS_DOME, MAPS_GOGGLE, draw_map
 from telecortex.session import (DEFAULT_BAUD, TEENSY_VID, TelecortexSession,
                                 find_serial_dev)
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexSessionConfig
-from telecortex.graphics import fill_rainbows, MAX_ANGLE
-
 
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 10
@@ -73,9 +72,7 @@ def main():
     # test_img = cv2.imread(
     #     '/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg',
     #     cv2.IMREAD_COLOR)
-    test_img = np.ndarray(
-        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
-        dtype=np.uint8)
+    test_img = get_square_canvas()
 
     if conf.args.enable_preview:
         window_flags = 0

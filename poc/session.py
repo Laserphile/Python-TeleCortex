@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 from context import telecortex
 from telecortex.config import TeleCortexManagerConfig
+from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
                                 normalize_pix_map, rotate_mapping,
@@ -23,7 +24,6 @@ from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
                                 transpose_mapping)
 from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
-from telecortex.graphics import fill_rainbows, MAX_ANGLE
 
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 5
@@ -52,9 +52,7 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    img = np.ndarray(
-        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
-        dtype=np.uint8)
+    img = get_square_canvas()
 
     if conf.args.enable_preview:
         window_flags = 0

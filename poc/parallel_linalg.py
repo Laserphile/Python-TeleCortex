@@ -16,7 +16,7 @@ import numpy as np
 from context import telecortex
 from mss import mss
 from telecortex.config import TeleCortexThreadManagerConfig
-from telecortex.graphics import MAX_ANGLE, fill_rainbows
+from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import PANELS_PER_CONTROLLER, draw_map
 from telecortex.util import pix_array2text
@@ -47,9 +47,7 @@ def main():
 
     manager = conf.setup_manager()
 
-    img = np.ndarray(
-        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
-        dtype=np.uint8)
+    img = get_square_canvas()
 
     if conf.args.enable_preview:
         window_flags = 0
