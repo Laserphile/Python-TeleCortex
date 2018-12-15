@@ -29,7 +29,7 @@ import multiprocessing as mp
 # pip install pyserial
 # python -m serial.tools.list_ports --verbose
 
-DEFAULT_BAUD = 57600
+DEFAULT_BAUD = 1000000
 DEFAULT_TIMEOUT = 1
 
 # Fix for this issue:
@@ -338,7 +338,6 @@ class TelecortexSession(object):
             offset += pixels_left
 
     def chunk_payload_without_linenum(self, cmd, static_args, payload):
-        import pudb; pudb.set_trace()
         offset = 0
         if not static_args:
             static_args = {}
