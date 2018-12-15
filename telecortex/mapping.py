@@ -495,11 +495,14 @@ def generate_panel_maps(generator):
         for panel_number, size, scale, angle, offset in server_panel_info:
             map_name = "%s-%d-%d" % (size, server_id, panel_number)
             if size not in MAPS_DOME:
-                raise UserWarning('Panel size %s not in known mappings: %s' %(
-                    size, MAPS_DOME.keys()
-                ))
+                raise UserWarning(
+                    'Panel size %s not in known mappings: %s' % (
+                        size, MAPS_DOME.keys()
+                    )
+                )
             panel_map = MAPS_DOME[size]
-            panel_map = transform_panel_map(panel_map, size, scale, angle, offset)
+            panel_map = transform_panel_map(
+                panel_map, size, scale, angle, offset)
 
             panels[server_id].append((panel_number, map_name))
             maps[map_name] = panel_map
@@ -520,8 +523,8 @@ def draw_map(image, pix_map_normlized, radius=1, outline=None):
     for pixel in pix_map_normlized:
         pix_coordinate = denormalize_coordinate(image.shape, pixel)
         pix_coordinate = (
-            int(pix_coordinate[1]),
-            int(pix_coordinate[0])
+            int(pix_coordinate[0]),
+            int(pix_coordinate[1])
         )
         cv2.circle(image, pix_coordinate, radius, outline, 1)
     return image
