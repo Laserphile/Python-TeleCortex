@@ -3,7 +3,6 @@
 
 """Demonstrate basic session capabilities."""
 
-import colorsys
 import itertools
 import logging
 import os
@@ -16,10 +15,12 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
+from telecortex.graphics import MAX_ANGLE, fill_rainbows
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PANELS,
-                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping, draw_map)
+from telecortex.mapping import (PANELS, PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
+                                draw_map, normalize_pix_map, rotate_mapping,
+                                rotate_vector, scale_mapping,
+                                transpose_mapping)
 from telecortex.session import SERVERS, TelecortexSessionManager
 from telecortex.util import pix_array2text
 
@@ -28,7 +29,7 @@ from telecortex.util import pix_array2text
 STREAM_LOG_LEVEL = logging.WARN
 # STREAM_LOG_LEVEL = logging.ERROR
 
-LOG_FILE = ".linalg.log"
+LOG_FILE = ".touch_dome.log"
 ENABLE_LOG_FILE = False
 ENABLE_PREVIEW = True
 
@@ -46,9 +47,6 @@ if ENABLE_LOG_FILE:
     LOGGER.addHandler(FILE_HANDLER)
 LOGGER.addHandler(STREAM_HANDLER)
 
-IMG_SIZE = 256
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'
@@ -57,16 +55,9 @@ INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
 
-def fill_rainbows(image, angle=0.0):
-    for col in range(IMG_SIZE):
-        hue = (col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE) % MAX_HUE
-        rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-        # logging.debug("rgb: %s" % (rgb,))
-        cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
-    return image
-
-
 def main():
+    telecortex.graphics.IMG_SIZE = 256
+
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
     manager = TelecortexSessionManager(SERVERS)
@@ -74,7 +65,9 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    img = np.ndarray(
+        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
+        dtype=np.uint8)
 
     if ENABLE_PREVIEW:
         window_flags = 0
@@ -93,7 +86,9 @@ def main():
     start_time = time_now()
 
     while any([manager.sessions.get(server_id) for server_id in PANELS]):
-        frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+        frameno = (
+            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
+        ) % MAX_ANGLE
         fill_rainbows(img, frameno)
 
         for server_id, server_panel_info in PANELS.items():

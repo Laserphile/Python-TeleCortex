@@ -1,5 +1,4 @@
 
-import colorsys
 import itertools
 import logging
 import multiprocessing as mp
@@ -21,11 +20,7 @@ from telecortex.mapping import MAPS_DOME, draw_map, transform_panel_map
 from telecortex.session import TelecortexThreadManager
 from telecortex.util import pix_array2text
 
-conf.args.enable_preview = True
 
-IMG_SIZE = 256
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'

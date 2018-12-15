@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import colorsys
 import logging
 import os
 import tkinter as tk
@@ -26,10 +25,6 @@ from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexSessionConfig
 
 
-IMG_SIZE = 64
-MAX_HUE = 1.0
-MAX_ANGLE = 360
-
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 10
 MAIN_WINDOW = 'image_window'
@@ -37,26 +32,6 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
-
-def fill_rainbows(image, angle=0.0):
-    for col in range(IMG_SIZE):
-        hue = (col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE ) % MAX_HUE
-        rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-        # logging.debug("rgb: %s" % (rgb,))
-        cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
-    return image
-
-def draw_map(image, pix_map_normlized, outline=None):
-    """Given an image and a normalized pixel map, draw the map on the image."""
-    if outline is None:
-        outline = (0, 0, 0)
-    for pixel in pix_map_normlized:
-        pix_coordinate = (
-            int(image.shape[0] * pixel[0]),
-            int(image.shape[1] * pixel[1])
-        )
-        cv2.circle(image, pix_coordinate, DOT_RADIUS, outline, 1)
-    return image
 
 def main():
     """
@@ -67,6 +42,9 @@ def main():
     Rend some perpendicular rainbowz
     Respond to microcontroller
     """
+
+    telecortex.graphics.IMG_SIZE = 64
+
     conf = TeleCortexSessionConfig(
         name="interpolate_opencv",
         description="draw interpolated maps using opencv",
@@ -91,8 +69,12 @@ def main():
         logging.debug("target_device: %s" % target_device)
         logging.debug("baud: %s" % conf.args.serial_baud)
 
-    # test_img = cv2.imread('/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg', cv2.IMREAD_COLOR)
-    test_img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    # test_img = cv2.imread(
+    #     '/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg',
+    #     cv2.IMREAD_COLOR)
+    test_img = np.ndarray(
+        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
+        dtype=np.uint8)
 
     if conf.args.enable_preview:
         window_flags = 0

@@ -1,5 +1,3 @@
-
-import colorsys
 import itertools
 import logging
 import multiprocessing as mp
@@ -16,24 +14,21 @@ import cv2
 import numpy as np
 from context import telecortex
 from mss import mss
-from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PANELS, PANELS_PER_CONTROLLER, PIXEL_MAP_BIG, PIXEL_MAP_SMOL, PIXEL_MAP_OUTER, PIXEL_MAP_OUTER_FLIP,
-                                draw_map, normalize_pix_map, rotate_mapping,
-                                rotate_vector, scale_mapping,
-                                transpose_mapping)
-from telecortex.session import (DEFAULT_BAUD, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession,
-                                TelecortexSessionManager,
-                                TelecortexThreadManager)
-from telecortex.session import SERVERS_DOME as SERVERS
-from telecortex.util import pix_array2text
-from telecortex.mapping import MAPS_DOME, transform_panel_map
 from telecortex.config import TeleCortexConfig
+from telecortex.interpolation import interpolate_pixel_map
+from telecortex.mapping import (MAPS_DOME, PANELS, PANELS_PER_CONTROLLER,
+                                PIXEL_MAP_BIG, PIXEL_MAP_OUTER,
+                                PIXEL_MAP_OUTER_FLIP, PIXEL_MAP_SMOL, draw_map,
+                                normalize_pix_map, rotate_mapping,
+                                rotate_vector, scale_mapping,
+                                transform_panel_map, transpose_mapping)
+from telecortex.session import DEFAULT_BAUD, DEFAULT_TIMEOUT, PANEL_LENGTHS
+from telecortex.session import SERVERS_DOME as SERVERS
+from telecortex.session import (TelecortexSession, TelecortexSessionManager,
+                                TelecortexThreadManager)
+from telecortex.util import pix_array2text
 
 
-IMG_SIZE = 128
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 2
 MAIN_WINDOW = 'image_window'

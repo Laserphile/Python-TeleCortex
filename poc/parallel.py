@@ -27,7 +27,6 @@ from telecortex.session import TelecortexSession, TelecortexThreadManager
 from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexConfig
 
-IMG_SIZE = 256
 MAX_HUE = 1.0
 MAX_ANGLE = 360
 TARGET_FRAMERATE = 20

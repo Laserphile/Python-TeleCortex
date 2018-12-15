@@ -3,7 +3,6 @@
 
 """Demonstrate basic session capabilities."""
 
-import colorsys
 import itertools
 import logging
 import os
@@ -16,20 +15,17 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
+from telecortex.config import TeleCortexManagerConfig
+from telecortex.graphics import MAX_ANGLE, fill_rainbows
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
-                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping, draw_map)
 from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
-from telecortex.mapping import transform_panel_map
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
+                                normalize_pix_map, rotate_mapping,
+                                rotate_vector, scale_mapping,
+                                transform_panel_map, transpose_mapping)
 from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
-from telecortex.config import TeleCortexManagerConfig
 
-
-IMG_SIZE = 256
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'
@@ -37,15 +33,11 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
-def fill_rainbows(image, angle=0.0):
-    for col in range(IMG_SIZE):
-        hue = (col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE ) % MAX_HUE
-        rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-        # logging.debug("rgb: %s" % (rgb,))
-        cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
-    return image
 
 def main():
+
+    telecortex.graphics.IMG_SIZE = 256
+
     conf = TeleCortexManagerConfig(
         name="linalg",
         description=(
@@ -59,7 +51,10 @@ def main():
 
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    img = np.ndarray(
+        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
+        dtype=np.uint8
+    )
 
     if conf.args.enable_preview:
         window_flags = 0

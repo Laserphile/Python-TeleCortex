@@ -1,5 +1,4 @@
 
-import colorsys
 import itertools
 import logging
 import multiprocessing as mp
@@ -30,9 +29,6 @@ from telecortex.mapping import MAPS_DOME, transform_panel_map
 from telecortex.config import TeleCortexConfig
 
 
-IMG_SIZE = 128
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 2
 MAIN_WINDOW = 'image_window'

@@ -1,15 +1,14 @@
 
-import colorsys
 import itertools
+import json
 import logging
 import multiprocessing as mp
 import os
+import re
 import sys
 from collections import OrderedDict
 from datetime import datetime
 from time import time as time_now
-import re
-import json
 
 import serial
 
@@ -18,18 +17,14 @@ import cv2
 import numpy as np
 from context import telecortex
 from mss import mss
-from telecortex.session import (DEFAULT_BAUD, DEFAULT_TIMEOUT,
-                                PANEL_LENGTHS, TelecortexSession,
-                                TelecortexSessionManager,
-                                TelecortexThreadManager)
-from telecortex.session import SERVERS_BLANK as SERVERS
-from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexConfig
+from telecortex.session import DEFAULT_BAUD, DEFAULT_TIMEOUT, PANEL_LENGTHS
+from telecortex.session import SERVERS_BLANK as SERVERS
+from telecortex.session import (TelecortexSession, TelecortexSessionManager,
+                                TelecortexThreadManager)
+from telecortex.util import pix_array2text
 
 
-IMG_SIZE = 128
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 2
 MAIN_WINDOW = 'image_window'

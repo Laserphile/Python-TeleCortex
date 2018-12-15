@@ -3,7 +3,6 @@
 
 """Demonstrate basic session capabilities."""
 
-import colorsys
 import itertools
 import logging
 import os
@@ -24,32 +23,8 @@ from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
                                 transpose_mapping)
 from telecortex.session import TelecortexSessionManager
 from telecortex.util import pix_array2text
+from telecortex.graphics import fill_rainbows, MAX_ANGLE
 
-# STREAM_LOG_LEVEL = logging.DEBUG
-# STREAM_LOG_LEVEL = logging.INFO
-STREAM_LOG_LEVEL = logging.WARN
-# STREAM_LOG_LEVEL = logging.ERROR
-
-LOG_FILE = ".sesssion.log"
-ENABLE_LOG_FILE = False
-
-LOGGER = logging.getLogger()
-LOGGER.setLevel(logging.DEBUG)
-FILE_HANDLER = logging.FileHandler(LOG_FILE)
-FILE_HANDLER.setLevel(logging.DEBUG)
-STREAM_HANDLER = logging.StreamHandler()
-STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
-if os.name != 'nt':
-    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
-STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
-STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
-LOGGER.addHandler(STREAM_HANDLER)
-
-IMG_SIZE = 64
-MAX_HUE = 1.0
-MAX_ANGLE = 360
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'
@@ -57,24 +32,9 @@ MAIN_WINDOW = 'image_window'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
 
-
-def fill_rainbows(image, angle=0.0):
-    """
-    Given an openCV image, fill with ranbows.
-
-    - `angle` is the hue offset
-    """
-    for col in range(IMG_SIZE):
-        hue = (
-            col * MAX_HUE / IMG_SIZE + angle * MAX_HUE / MAX_ANGLE
-        ) % MAX_HUE
-        rgb = tuple(c * 255 for c in colorsys.hls_to_rgb(hue, 0.5, 1))
-        # logging.debug("rgb: %s" % (rgb,))
-        cv2.line(image, (col, 0), (col, IMG_SIZE), color=rgb, thickness=1)
-    return image
-
-
 def main():
+    telecortex.graphics.IMG_SIZE = 100
+
     conf = TeleCortexManagerConfig(
         name="session",
         description=(
@@ -92,7 +52,9 @@ def main():
     pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
     pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
 
-    img = np.ndarray(shape=(IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    img = np.ndarray(
+        shape=(telecortex.graphics.IMG_SIZE, telecortex.graphics.IMG_SIZE, 3),
+        dtype=np.uint8)
 
     if conf.args.enable_preview:
         window_flags = 0
