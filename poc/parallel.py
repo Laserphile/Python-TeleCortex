@@ -110,9 +110,7 @@ def main():
                     "M2600", {"Q": panel_number}, pixel_str
                 )
 
-        while not manager.all_idle:
-            logging.debug("waiting on queue")
-            time.sleep(0.1)
+        manager.wait_for_workers()
 
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)

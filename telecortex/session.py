@@ -495,6 +495,8 @@ class TelecortexSession(object):
         #     )
         # )
         while len(byte_array) > (self.ser_buff_size - self.ser.out_waiting):
+            # TODO: relinquish control to other threads here
+            time.sleep(0.001)
             logging.debug("waiting on write out: %d > (%d - %d)" % (
                 len(byte_array),
                 self.chunk_size,
@@ -844,12 +846,16 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         # listen for commands
         while sesh:
             try:
-                cmd, args, payload = queue.get(timeout=0.01)
+                cmd, args, payload = queue.get(timeout=0.001)
             except Exception as exc:
                 # logging.error(exc)
                 continue
             # logging.debug("received: %s" % str((cmd, args, payload)))
             sesh.chunk_payload_with_linenum(cmd, args, payload)
+            while not sesh.ready:
+                logging.debug("sesh not ready: %s" % sesh.cid)
+                # TODO: relinquish control here
+                time.sleep(0.01)
 
     def refresh_connections(self, server_ids=None):
         if server_ids is None:
@@ -887,6 +893,11 @@ class TelecortexThreadManager(TeleCortexBaseManager):
     @property
     def all_idle(self):
         return all([queue.empty() for (queue, proc) in self.threads.values()])
+
+    def wait_for_workers(self):
+        while not self.all_idle:
+            logging.debug("waiting on queue")
+            time.sleep(0.02)
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
         loops = 0

@@ -4,6 +4,7 @@ import logging
 import math
 import os
 import random
+import time
 from collections import OrderedDict
 from time import time as time_now
 import coloredlogs
@@ -91,8 +92,7 @@ def main():
                     "M2600", {"Q": panel_number}, pixel_str
                 )
 
-        # while not manager.all_idle:
-        # logging.debug("waiting on queue")
+        manager.wait_for_workers()
 
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
