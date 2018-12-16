@@ -39,7 +39,7 @@ class TeleCortexConfig(object):
         self.parser.add_argument('--ignore-acks', action='store_true',
                                  default=False)
         self.parser.add_argument('--chunk-size', default=230, type=int)
-        self.parser.add_argument('--ser-buff-size', default=(230 * 1.2),
+        self.parser.add_argument('--ser-buf-size', default=(230 * 1.2),
                                  type=int)
 
         # self.parser.add_argument('--disable-log-file', action='store_false',
@@ -136,6 +136,7 @@ class TeleCortexConfig(object):
         self.stream_handler.addFilter(coloredlogs.ProgramNameFilter())
         self.logger.addHandler(self.stream_handler)
 
+
 class TeleCortexSessionConfig(TeleCortexConfig):
     """
     Config for a single session
@@ -148,10 +149,11 @@ class TeleCortexSessionConfig(TeleCortexConfig):
             do_crc=self.args.do_crc,
             ignore_acks=self.args.ignore_acks,
             chunk_size=self.args.chunk_size,
-            ser_buff_size=self.args.ser_buff_size
+            ser_buf_size=self.args.ser_buf_size
         )
         sesh.reset_board()
         return sesh
+
 
 class TeleCortexManagerConfig(TeleCortexConfig):
     """
@@ -172,7 +174,7 @@ class TeleCortexManagerConfig(TeleCortexConfig):
             do_crc=self.args.do_crc,
             ignore_acks=self.args.ignore_acks,
             chunk_size=self.args.chunk_size,
-            ser_buff_size=self.args.ser_buff_size
+            ser_buf_size=self.args.ser_buf_size
         )
         return manager
 

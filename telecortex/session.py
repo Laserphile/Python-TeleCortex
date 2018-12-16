@@ -2,27 +2,27 @@ from __future__ import unicode_literals
 
 import base64
 import itertools
+import json
 import logging
+import multiprocessing as mp
 import os
-import sys
+import queue
 import re
+import sys
 import time
-from time import time as time_now
+from builtins import super
 from collections import OrderedDict, deque
+from copy import deepcopy
 from datetime import datetime
 from pprint import pformat, pprint
-from copy import deepcopy
-import queue
-from builtins import super
-import json
-
-import serial
-from serial.tools import list_ports
+from time import time as time_now
 
 import coloredlogs
-import six
+import serial
 from kitchen.text import converters
-import multiprocessing as mp
+from serial.tools import list_ports
+
+import six
 
 # TODO: soft reset when linenum approach long int so it can run forever
 
@@ -41,6 +41,7 @@ TEENSY_VID = 0x16C0
 PANEL_LENGTHS = [
     316, 260, 260, 260
 ]
+
 
 def find_serial_dev(vid=None, pid=None, ser=None):
     """
@@ -64,7 +65,8 @@ def find_serial_dev(vid=None, pid=None, ser=None):
             logging.debug("pid not match %s | %s", pid, port_info.pid)
             continue
         if ser is not None and port_info.serial_number != str(ser):
-            logging.debug("ser not match %s | %s", ser, port_info.serial_number)
+            logging.debug(
+                "ser not match %s | %s", ser, port_info.serial_number)
             continue
         logging.info("found target device: %s" % port_info.device)
         target_device = port_info.device
@@ -94,15 +96,18 @@ def query_serial_dev(vid=None, pid=None, ser=None, dev=None):
             logging.debug("pid not match %s | %s", pid, port_info.pid)
             continue
         if ser is not None and port_info.serial_number != str(ser):
-            logging.debug("ser not match %s | %s", ser, port_info.serial_number)
+            logging.debug(
+                "ser not match %s | %s", ser, port_info.serial_number)
             continue
         if dev is not None and port_info.device != dev:
-            logging.debug("dev not match %s | %s", ser, port_info.serial_number)
+            logging.debug(
+                "dev not match %s | %s", ser, port_info.serial_number)
             continue
         logging.info("found target device: %s" % port_info.device)
         target_device = port_info.device
         matching_devs.append(target_device)
     return matching_devs
+
 
 class TelecortexCommand(object):
     """
@@ -127,8 +132,8 @@ class TelecortexCommand(object):
         checksum = 0
         if cmd[-1] != ' ':
             cmd += ' '
-        for c in cmd:
-            checksum ^= ord(c)
+        for char in cmd:
+            checksum ^= ord(char)
         return cmd + "*%d" % checksum
 
     def fmt(self, checksum=False):
@@ -137,13 +142,13 @@ class TelecortexCommand(object):
             cmd = self.add_checksum(cmd)
         return cmd
 
+
 class TelecortexLineCommand(TelecortexCommand):
     """
     Telecortex Command which has a linenumber
     """
-    def __init__(self, owner, linenum, cmd, args=None):
+    def __init__(self, linenum, cmd, args=None):
         super(TelecortexLineCommand, self).__init__(cmd, args)
-        self.owner = owner
         self.linenum = linenum
 
     @classmethod
@@ -160,20 +165,15 @@ class TelecortexLineCommand(TelecortexCommand):
         return cmd
 
 
-class TelecortexSession(object):
+class TelecortexBaseSession(object):
     """
-    Manages a serial session with a Telecortex device.
+    Manages a abstract session with a Telecortex device.
 
     When commands are sent that require acknowledgement (with linenum),
     they are queued in ack_queue until the acknowledgement or error for that
     command is received.
     When
     """
-
-    # TODO: group idle debug prints
-
-    serial_class = serial.Serial
-
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line = r"^N(?P<linenum>\d+)"
     re_line_ok = r"%s:\s*OK" % re_line
@@ -190,126 +190,154 @@ class TelecortexSession(object):
         r"QUEUE:\s+(?P<queue_occ>\d+)\s*/\s*(?P<queue_max>\d+)"
     ) % re_loo
 
-    def __init__(self, ser, linecount=0, **kwargs):
-        super(TelecortexSession, self).__init__()
-        self.ser = ser
+    def __init__(self, linecount=0, **kwargs):
+        # Current linecount used as sequence number for error detection
         self.linecount = linecount
-        # commands which expect acknowledgement
-        self.ack_queue = OrderedDict()
-        self.responses = OrderedDict()
-        self.cid = 0
-        self.line_buffer = ""
+        # Lines which have been recieved but are yet to be processed
         self.line_queue = deque()
+        # Command objects which are yet to be acknowledged
+        self.ack_queue = OrderedDict()
+        # Responses attached to a line number which are not "OK" or "ERROR"
+        self.responses = OrderedDict()
+        # Controller ID as reported by controller
+        self.cid = None
+        # Partially complete received lines
+        self.line_buffer = ""
+        # Last line which was receieved
+        self.last_line = None
+        # Limits the number of commands which have yet to be acknoqledged
         self.max_ack_queue = kwargs.get('max_ack_queue', 5)
         assert isinstance(self.max_ack_queue, six.integer_types)
+        # Determins if Cyclic Redundancy Check is added to commands
         self.do_crc = kwargs.get('do_crc', True)
+        # Determines if acknowledgments are processed.
         self.ignore_acks = kwargs.get('ignore_acks', False)
+        # Maximum length of command, larger commands are chunked to fit.
         self.chunk_size = kwargs.get('chunk_size', 2000)
-        self.ser_buff_size = kwargs.get('ser_buff_size', 10000)
+        # Maximum bytes allowed to sit in Serial.out_waiting
+        self.ser_buf_size = kwargs.get('ser_buf_size', 10000)
 
-    @property
-    def lines_avail(self):
-        # TODO: something seems to crash this all the time:
+    def get_line(self):
         """
-        Traceback (most recent call last):
-          File "poc/rainbows.py", line 69, in main
-            sesh.send_cmd_without_linenum("M2603", {"Q":panel, "V":pixel_str})
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 246, in send_cmd_without_linenum
-            self.send_cmd_obj(cmd_obj)
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 229, in send_cmd_obj
-            self.parse_responses()
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 553, in parse_responses
-            self.parse_response(line)
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 537, in parse_response
-            self.handle_resend(**match)
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 442, in handle_resend
-            resend_command.args
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 238, in send_cmd_with_linenum
-            self.send_cmd_obj(cmd_obj)
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 228, in send_cmd_obj
-            while self.lines_avail or self.bytes_left < len(full_cmd):
-          File "/Users/derwent/Documents/GitHub/Python-TeleCortex/telecortex/session.py", line 208, in lines_avail
-            return self.ser.in_waiting
-          File "/Users/derwent/.pyenv/versions/3.6.2/lib/python3.6/site-packages/serial/serialpos[watchdog] outside of io loop, proc.returncode is -15 - -15 (SIGTERM)
+        Retrieve a single line which has been received from the controller.
         """
+        raise NotImplementedError()
 
-        return self.ser.in_waiting
+    def set_linenum(self, linenum):
+        """
+        Set the line number used by the controller and this manager.
+        """
+        raise NotImplementedError()
 
-    @classmethod
-    def from_serial_conf(cls, serial_conf, linenum=0):
-        # TODO: I don't think this works because of garbage collection?
-        ser = cls.serial_class(
-            port=serial_conf.get('port'),
-            baudrate=serial_conf.get('baud', DEFAULT_BAUD),
-            timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
-        )
-        return cls(ser, linenum)
+    def send_cmd_obj(self, cmd):
+        """
+        Send a command object to the controller.
+        """
+        raise NotImplementedError()
 
-    def fmt_cmd(self, linenum=None, cmd=None, args=None):
-        raise DeprecationWarning("create cmd object and format instead")
+    def get_cid(self):
+        """
+        Populate this instance's controller id by asking the controller
+        """
+        raise NotImplementedError()
 
-    def add_checksum(self, full_cmd):
-        raise DeprecationWarning("create cmd object add instead")
-
-    def send_cmd_obj(self, cmd_obj):
-        full_cmd = cmd_obj.fmt(checksum=self.do_crc)
-        while any([
-            self.lines_avail,
-            self.bytes_left < len(full_cmd),
-            # self.last_idle - time_now() > 1,
-            # self.last_loo_rate - time_now() > 1
-        ]):
-            self.parse_responses()
-        cmd_obj.bytes_occupied = self.write_line(full_cmd)
-        self.last_cmd = cmd_obj
+    def reset_board(self):
+        """
+        Software reset the controller
+        """
+        raise NotImplementedError()
 
     def send_cmd_with_linenum(self, cmd, args=None):
         """
-        Send a command, expecting an eventual acknowledgement of that command later.
+        Send a command, expect an eventual acknowledgement.
         """
-        cmd_obj = TelecortexLineCommand(self, self.linecount, cmd, args)
+        cmd_obj = TelecortexLineCommand(self.linecount, cmd, args)
         self.send_cmd_obj(cmd_obj)
         if not self.ignore_acks:
             self.ack_queue[self.linecount] = cmd_obj
-        logging.debug("sending cmd with lineno, %s, ack_queue: %s" % (repr(cmd_obj.fmt(checksum=self.do_crc)), self.ack_queue.keys()))
+        logging.debug("sending cmd with lineno, %s, ack_queue: %s" % (
+            repr(cmd_obj.fmt(checksum=self.do_crc)), self.ack_queue.keys()))
         self.linecount += 1
 
     def send_cmd_without_linenum(self, cmd, args=None):
         cmd_obj = TelecortexCommand(cmd, args)
         self.send_cmd_obj(cmd_obj)
-        logging.debug("sending cmd without lineno %s" % repr(cmd_obj.fmt()))
+        logging.debug("sending cmd without lineno %s" % (
+            repr(cmd_obj.fmt(checksum=self.do_crc))))
 
-    def flush_in(self):
-        # wiggle DTR and CTS (only works with AVR boards)
-        # self.ser.dtr = not self.ser.dtr
-        # self.ser.rts = not self.ser.rts
-        # time.sleep(0.1)
-        # self.ser.dtr = not self.ser.dtr
-        # self.ser.rts = not self.ser.rts
-        # time.sleep(0.5)
+    def parse_response(self, line):
+        if line.startswith("IDLE"):
+            self.idles_recvd += 1
+        elif line.startswith(";"):
+            if re.match(self.re_loo_rates, line):
+                self.last_loo_rate = time_now()
+                match = re.search(self.re_loo_rates, line).groupdict()
+                pix_rate = int(match.get('pix_rate'))
+                cmd_rate = int(match.get('cmd_rate'))
+                fps = int(match.get('fps'))
+                queue_occ = int(match.get('queue_occ'))
+                queue_max = int(match.get('queue_max'))
+                logging.warning(
+                    (
+                        "CID: %2s FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, "
+                        "QUEUE: %s") % (
+                        self.cid, fps, cmd_rate, pix_rate,
+                        "%s / %s" % (queue_occ, queue_max)
+                    )
+                )
+            elif re.match(self.re_set, line):
+                logging.info(line)
+        elif line.startswith("N"):
+            self.action_idle = False
+            # either "N\d+: OK" or N\d+: E\d+:
+            if re.match(self.re_line_ok, line):
+                match = re.search(self.re_line_ok, line).groupdict()
+                self.handle_line_ok_match(match)
+            elif re.match(self.re_line_error, line):
+                match = re.search(self.re_line_error, line).groupdict()
+                self.handle_error(**match)
+            elif re.match(self.re_line_response, line):
+                match = re.search(self.re_line_response, line).groupdict()
+                self.handle_line_response(**match)
+        elif line.startswith("E"):
+            self.action_idle = False
+            if re.match(self.re_error, line):
+                match = re.search(self.re_error, line).groupdict()
+                self.handle_error(**match)
+        elif line.startswith("RS"):
+            self.action_idle = False
+            if re.match(self.re_resend, line):
+                match = re.search(self.re_resend, line).groupdict()
+                self.handle_resend(**match)
+        else:
+            logging.warn(
+                "CID: %s line not recognised:\n%s\n" % (
+                    self.cid,
+                    repr(line.encode('ascii', errors='backslashreplace'))
+                )
+            )
 
-        while self.lines_avail:
-            self.get_line()
+    def parse_responses(self):
+        """
+        Parse all of the lines in the incoming line queue in order.
 
-    def reset_board(self):
-        self.last_idle = time_now()
-        self.last_loo_rate = time_now()
-        self.ser.reset_output_buffer()
-        self.send_cmd_without_linenum("M9999")
-        self.flush_in()
-        self.set_linenum(0)
-
-    def get_cid(self):
-        linenum = self.linecount
-        self.send_cmd_with_linenum("P2205")
-        while linenum not in self.responses:
-            self.parse_responses()
-        response = self.responses.get(linenum)
-        assert \
-            response.startswith('S'), \
-            "unknown response format for N%d: %s" % (linenum, response)
-        self.cid = response[1:]
-        return self.cid
+        Assume that controller may send many commands at the same time.
+        """
+        line = self.get_line()
+        self.idles_recvd = 0
+        self.action_idle = True
+        while True:
+            if not line:
+                break
+            self.parse_response(line)
+            line = self.get_line()
+        if self.idles_recvd > 0:
+            logging.info('Idle received x %s' % self.idles_recvd)
+        if self.action_idle and self.idles_recvd:
+            self.last_idle = time_now()
+            self.clear_ack_queue()
+        # else:
+        #     logging.debug("did not recieve IDLE")
 
     def chunk_payload_with_linenum(self, cmd, static_args, payload=None):
         if payload is None:
@@ -326,11 +354,15 @@ class TelecortexSession(object):
                 chunk_args
             )
             # 4 bytes per pixel because base64 encoded 24bit RGB
-            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
+            pixels_left = int(
+                (self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
 
             assert \
                 pixels_left > 0, \
-                "not enough bytes left to chunk cmd, skeleton: %s, chunk_size: %s" % (
+                (
+                    "not enough bytes left to chunk cmd, skeleton: %s, "
+                    "chunk_size: %s"
+                ) % (
                     skeleton_cmd,
                     self.chunk_size
                 )
@@ -360,10 +392,14 @@ class TelecortexSession(object):
                 chunk_args
             )
             # 4 bytes per pixel because base64 encoded 24bit RGB
-            pixels_left = int((self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
+            pixels_left = int(
+                (self.chunk_size - len(skeleton_cmd) - len(' ****\r\n')) / 4)
             assert \
                 pixels_left > 0, \
-                "not enough bytes left to chunk cmd, skeleton: %s, chunk_size: %s" % (
+                (
+                    "not enough bytes left to chunk cmd, skeleton: %s, "
+                    "chunk_size: %s"
+                ) % (
                     skeleton_cmd,
                     self.chunk_size
                 )
@@ -445,7 +481,6 @@ class TelecortexSession(object):
             linenum = int(kwargs.get('linenum', None))
         except (ValueError, TypeError):
             linenum = None
-        # TODO: finish this
         self.responses[linenum] = kwargs.get('response', '')
 
     def handle_resend(self, **kwargs):
@@ -455,13 +490,15 @@ class TelecortexSession(object):
             linenum = None
 
         if linenum not in self.ack_queue:
-            error = "CID: %s could not resend unknown linenum: %d" % (self.cid, linenum)
+            error = "CID: %s could not resend unknown linenum: %d" % (
+                self.cid, linenum)
             logging.error(error)
             # raise UserWarning(error)
         warning = "CID: %s resending %s" % (
             self.cid,
             ", ".join([
-                "N%s" % line for line in self.ack_queue.keys() if line >= linenum
+                "N%s" % line
+                for line in self.ack_queue.keys() if line >= linenum
             ])
         )
         logging.warning(warning)
@@ -475,7 +512,107 @@ class TelecortexSession(object):
                     resend_command.args
                 )
 
+    @property
+    def ready(self):
+        return True
+
+# TODO: rename to TelecortexSerialSession or something
+
+
+class TelecortexSession(TelecortexBaseSession):
+    """
+    Manages a serial session with a Telecortex device.
+    """
+
+    serial_class = serial.Serial
+
+    def __init__(self, ser, **kwargs):
+        super(TelecortexSession, self).__init__(**kwargs)
+        self.ser = ser
+
+    @property
+    def lines_avail(self):
+        return self.ser.in_waiting
+
+    def relinquish(self):
+        """
+        Potentially relinquish control to other threads.
+        """
+        time.sleep(0.01)
+
+    @classmethod
+    def from_serial_conf(cls, serial_conf, linenum=0):
+        # TODO: I don't think this works because of garbage collection?
+        ser = cls.serial_class(
+            port=serial_conf.get('port'),
+            baudrate=serial_conf.get('baud', DEFAULT_BAUD),
+            timeout=serial_conf.get('timeout', DEFAULT_TIMEOUT)
+        )
+        return cls(ser, linenum)
+
+    def fmt_cmd(self, linenum=None, cmd=None, args=None):
+        raise DeprecationWarning("create cmd object and format instead")
+
+    def add_checksum(self, full_cmd):
+        raise DeprecationWarning("create cmd object add instead")
+
+    def send_cmd_obj(self, cmd_obj):
+        """
+        @overrides TelecortexBaseSession.send_cmd_obj
+        """
+        full_cmd = cmd_obj.fmt(checksum=self.do_crc)
+        while any([
+            self.lines_avail,
+            self.bytes_left < len(full_cmd),
+            # self.last_idle - time_now() > 1,
+            # self.last_loo_rate - time_now() > 1
+        ]):
+            self.parse_responses()
+        cmd_obj.bytes_occupied = self.write_line(full_cmd)
+        self.last_cmd = cmd_obj
+
+    def flush_in(self):
+        # wiggle DTR and CTS (only works with AVR boards)
+        # self.ser.dtr = not self.ser.dtr
+        # self.ser.rts = not self.ser.rts
+        # time.sleep(0.1)
+        # self.ser.dtr = not self.ser.dtr
+        # self.ser.rts = not self.ser.rts
+        # time.sleep(0.5)
+
+        while self.lines_avail:
+            self.get_line()
+
+    def reset_board(self):
+        """
+        @overrides TelecortexBaseSession.reset_board
+        """
+        self.last_idle = time_now()
+        self.last_loo_rate = time_now()
+        self.ser.reset_output_buffer()
+        self.send_cmd_without_linenum("M9999")
+        self.flush_in()
+        self.set_linenum(0)
+
+    def get_cid(self):
+        """
+        @overrides TelecortexBaseSession.get_cid
+        """
+        linenum = self.linecount
+        self.send_cmd_with_linenum("P2205")
+        while linenum not in self.responses:
+            self.parse_responses()
+        response = self.responses.get(linenum)
+        assert \
+            response.startswith('S'), \
+            "unknown response format for N%d: %s" % (linenum, response)
+        self.cid = response[1:]
+        return self.cid
+
     def set_linenum(self, linenum):
+        """
+        @overrides TelecortexBaseSession.set_linenum
+        """
         self.send_cmd_with_linenum(
             "M110",
             {"N": linenum}
@@ -486,9 +623,7 @@ class TelecortexSession(object):
             self.parse_responses()
 
     def write_line(self, text):
-        # byte_array = [six.byte2int(j) for j in text]
-        # byte_array = six.binary_type(text, 'latin-1')
-
+        # byte_array = serial.to_bytes(text)
         if not text[-1] == '\n':
             text = text + '\n'
         assert isinstance(text, six.text_type), "text should be text_type"
@@ -496,30 +631,20 @@ class TelecortexSession(object):
             byte_array = six.binary_type(text, 'latin-1')
         if six.PY2:
             byte_array = six.binary_type(text)
-        # logging.debug(
-        #     "before write | CTS %s, DSR: %s, RTS %s, DTR %s, RI: %s, CD: %s" % (
-        #         self.ser.cts, self.ser.dsr, self.ser.rts, self.ser.dtr, self.ser.ri, self.ser.cd
-        #     )
-        # )
-        while len(byte_array) > (self.ser_buff_size - self.ser.out_waiting):
+        while len(byte_array) > (self.ser_buf_size - self.ser.out_waiting):
             logging.debug("waiting on write out: %d > (%d - %d)" % (
                 len(byte_array),
                 self.chunk_size,
                 self.ser.out_waiting
             ))
-            # TODO: relinquish control to other threads here
-            # time.sleep(0.01)
+            self.relinquish()
         self.ser.write(byte_array)
-        # TODO: relinquish control to other threads here
-        # time.sleep(0.005)
-        # logging.debug(
-        #     "after write | CTS %s, DSR: %s, RTS %s, DTR %s, RI: %s, CD: %s" % (
-        #         self.ser.cts, self.ser.dsr, self.ser.rts, self.ser.dtr, self.ser.ri, self.ser.cd
-        #     )
-        # )
         return len(byte_array)
 
     def get_line(self):
+        """
+        @overrides TelecortexBaseSession.get_line
+        """
         while self.ser.in_waiting:
             data = self.ser.read_all()
             self.line_buffer += converters.to_unicode(data)
@@ -535,90 +660,23 @@ class TelecortexSession(object):
             self.last_line = line
             return line
 
-    def parse_response(self, line):
-        if line.startswith("IDLE"):
-            self.idles_recvd += 1
-        elif line.startswith(";"):
-            if re.match(self.re_loo_rates, line):
-                self.last_loo_rate = time_now()
-                match = re.search(self.re_loo_rates, line).groupdict()
-                pix_rate = int(match.get('pix_rate'))
-                cmd_rate = int(match.get('cmd_rate'))
-                fps = int(match.get('fps'))
-                queue_occ = int(match.get('queue_occ'))
-                queue_max = int(match.get('queue_max'))
-                logging.warning(
-                    "CID: %2s FPS: %3s, CMD_RATE: %5d, PIX_RATE: %7d, QUEUE: %s" % (
-                        self.cid, fps, cmd_rate, pix_rate,
-                        "%s / %s" % (queue_occ, queue_max)
-                    )
-                )
-            elif re.match(self.re_set, line):
-                logging.info(line)
-        elif line.startswith("N"):
-            self.action_idle = False
-            # either "N\d+: OK" or N\d+: E\d+:
-            if re.match(self.re_line_ok, line):
-                match = re.search(self.re_line_ok, line).groupdict()
-                self.handle_line_ok_match(match)
-            elif re.match(self.re_line_error, line):
-                match = re.search(self.re_line_error, line).groupdict()
-                self.handle_error(**match)
-            elif re.match(self.re_line_response, line):
-                match = re.search(self.re_line_response, line).groupdict()
-                self.handle_line_response(**match)
-        elif line.startswith("E"):
-            self.action_idle = False
-            if re.match(self.re_error, line):
-                match = re.search(self.re_error, line).groupdict()
-                self.handle_error(**match)
-        elif line.startswith("RS"):
-            self.action_idle = False
-            if re.match(self.re_resend, line):
-                match = re.search(self.re_resend, line).groupdict()
-                self.handle_resend(**match)
-        else:
-            logging.warn(
-                "CID: %s line not recognised:\n%s\n" % (
-                    self.cid,
-                    repr(line.encode('ascii', errors='backslashreplace'))
-                )
-            )
-
-    def parse_responses(self):
-        line = self.get_line()
-        self.idles_recvd = 0
-        self.action_idle = True
-        while True:
-            if not line:
-                break
-            self.parse_response(line)
-            line = self.get_line()
-        if self.idles_recvd > 0:
-            logging.info('Idle received x %s' % self.idles_recvd)
-        if self.action_idle and self.idles_recvd:
-            self.last_idle = time_now()
-            self.clear_ack_queue()
-        # else:
-        #     logging.debug("did not recieve IDLE")
-
     @property
     def bytes_left(self):
-        ser_buff_len = self.ser.out_waiting
+        ser_buf_len = self.ser.out_waiting
         if not self.ignore_acks and len(self.ack_queue) > self.max_ack_queue:
             return 0
         if self.ignore_acks:
             for linenum, ack_cmd in self.ack_queue.items():
                 if ack_cmd.cmd == "M110":
                     return 0
-                ser_buff_len += ack_cmd.bytes_occupied
-                if ser_buff_len > self.ser_buff_size:
+                ser_buf_len += ack_cmd.bytes_occupied
+                if ser_buf_len > self.ser_buf_size:
                     return 0
-        return self.ser_buff_size - ser_buff_len
+        return self.ser_buf_size - ser_buf_len
 
     @property
     def ready(self):
-        if self.ser.out_waiting >= self.ser_buff_size:
+        if self.ser.out_waiting >= self.ser_buf_size:
             return False
         if not self.ignore_acks and len(self.ack_queue) >= self.max_ack_queue:
             return False
@@ -629,6 +687,7 @@ class TelecortexSession(object):
 
     def close(self):
         self.ser.close()
+
 
 class VirtualTelecortexSession(TelecortexSession):
     serial_class = dict
@@ -652,7 +711,6 @@ class VirtualTelecortexSession(TelecortexSession):
         return self.chunk_size * 2
 
     def parse_responses(self):
-        # time.sleep(0.01)
         if self.ack_queue:
             self.clear_ack_queue()
 
@@ -668,9 +726,14 @@ class VirtualTelecortexSession(TelecortexSession):
         pass
 
 
-"""
-servers is a list of objects containing information about a server's configuration.
-"""
+class ThreadedTelecortexSession(TelecortexSession):
+    def relinquish(self):
+        """
+        Relinquish control to other threads.
+        """
+        # TODO: actually relinquish
+        time.sleep(0.01)
+
 
 class TeleCortexBaseManager(object):
     serial_class = serial.Serial
@@ -681,8 +744,11 @@ class TeleCortexBaseManager(object):
         self.known_cids = OrderedDict()
         self.session_kwargs = kwargs
 
-    def get_serial_conf(self, server_info):
+    @classmethod
+    def relinquish(cls):
+        time.sleep(0.005)
 
+    def get_serial_conf(self, server_info):
         if 'file' in server_info:
             return {
                 'file': server_info.get('file'),
@@ -705,7 +771,6 @@ class TeleCortexBaseManager(object):
                 del dev_kwargs['pid']
 
         ports = query_serial_dev(**dev_kwargs)
-
 
         if 'cid' in server_info:
             ports_matching_cid = []
@@ -734,9 +799,11 @@ class TeleCortexBaseManager(object):
             ports = ports_matching_cid
 
         if len(ports) > 1:
-            logging.warning("ambiguous server info matches multiple ports: %s | %s" % (
-                server_info, ports
-            ))
+            logging.warning(
+                "ambiguous server info matches multiple ports: %s | %s" % (
+                    server_info, ports
+                )
+            )
 
         response = {
             'baud': server_info.get('baud', DEFAULT_BAUD),
@@ -744,10 +811,10 @@ class TeleCortexBaseManager(object):
         }
 
         if not ports:
-            logging.critical("target device not found for server: %s" % server_info)
+            logging.critical(
+                "target device not found for server: %s" % server_info)
             return {}
-        else:
-            response['file'] = ports[0]
+        response['file'] = ports[0]
 
         return response
 
@@ -756,6 +823,7 @@ class TeleCortexBaseManager(object):
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
         raise NotImplementedError()
+
 
 class TelecortexSessionManager(TeleCortexBaseManager):
 
@@ -766,7 +834,7 @@ class TelecortexSessionManager(TeleCortexBaseManager):
 
     def refresh_connections(self):
         """
-        Use information from `self.servers` to ensure all sessions are connected.
+        Use information from `self.servers`, ensure all sessions are connected.
         """
         for server_id, server_info in self.servers.items():
             logging.info(
@@ -799,7 +867,6 @@ class TelecortexSessionManager(TeleCortexBaseManager):
                 logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
 
-
     def close(self):
         for server_id, session in self.sessions.items():
             session.close()
@@ -811,6 +878,7 @@ class TelecortexSessionManager(TeleCortexBaseManager):
 
     def __exit__(self, *args, **kwargs):
         self.close()
+
 
 class TelecortexVirtualManagerMixin(object):
     """
@@ -827,12 +895,16 @@ class TelecortexVirtualManagerMixin(object):
         }
 
 
-class TelecortexVirtualManager(TelecortexSessionManager, TelecortexVirtualManagerMixin):
+class TelecortexVirtualManager(
+    TelecortexSessionManager, TelecortexVirtualManagerMixin
+):
     serial_class = TelecortexVirtualManagerMixin.serial_class
-    session_class =  TelecortexVirtualManagerMixin.session_class
+    session_class = TelecortexVirtualManagerMixin.session_class
     get_serial_conf = TelecortexVirtualManagerMixin.get_serial_conf
 
+
 class TelecortexThreadManager(TeleCortexBaseManager):
+    session_class = ThreadedTelecortexSession
 
     queue_length = 10
 
@@ -863,7 +935,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             except queue.Empty as exc:
                 logging.info("Queue Empty: %s | %s" % (sesh.cid, exc))
                 # TODO: relinquish control to other threads
-                time.sleep(0.01)
+                cls.relinquish()
                 continue
             except Exception as exc:
                 logging.error(exc)
@@ -873,13 +945,14 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             while not sesh.ready:
                 logging.debug("sesh not ready: %s" % sesh.cid)
                 # TODO: relinquish control here
-                time.sleep(0.01)
+                cls.relinquish()
 
     def refresh_connections(self, server_ids=None):
         if server_ids is None:
             server_ids = self.servers.keys()
 
-        assert sys.version_info > (3, 0), "multiprocessing only works properly on python 3"
+        assert sys.version_info > (3, 0), (
+            "multiprocessing only works properly on python 3")
         ctx = mp.get_context('fork')
 
         for server_id in server_ids:
@@ -903,7 +976,8 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
     @property
     def any_alive(self):
-        return any([self.threads.get(server_id, (None, None))[1] for server_id in self.servers.keys()])
+        return any([self.threads.get(server_id, (None, None))[1]
+                    for server_id in self.servers.keys()])
 
     def session_active(self, server_id):
         return self.threads.get(server_id)
@@ -912,28 +986,10 @@ class TelecortexThreadManager(TeleCortexBaseManager):
     def all_idle(self):
         return all([queue.empty() for (queue, proc) in self.threads.values()])
 
-    # @property
-    # def queue_sizes(self):
-    #     return [
-    #         queue.qsize() for (queue, proc) in self.threads.values()
-    #     ]
-
-    # @property
-    # def any_almost_full(self):
-    #     return any([
-    #         self.queue_length - queue.qsize() < 1
-    #         for (queue, proc) in self.threads.values()
-    #     ])
-
     def wait_for_workers_idle(self):
         while not self.all_idle:
             logging.debug("waiting on queue idle")
-            time.sleep(0.01)
-
-    # def wait_for_workers_not_almost_full(self):
-    #     while self.any_almost_full:
-    #         logging.debug("waiting on queue not almost full")
-    #         time.sleep(0.05)
+            self.relinquish()
 
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
         loops = 0
@@ -954,20 +1010,23 @@ class TelecortexThreadManager(TeleCortexBaseManager):
             except queue.Full as exc:
                 logging.debug("Queue Full: %d | %s" % (server_id, exc))
                 # TODO: relinquish control to other threads
-                time.sleep(0.01)
+                self.relinquish()
             except OSError as exc:
                 logging.error("OSError: %s" % exc)
                 self.refresh_connections([server_id])
-                # time.sleep(0.1)
                 continue
             except Exception as exc:
                 raise UserWarning("unhandled exception: %s" % str(exc))
             break
 
-class TeleCortexVirtualThreadManager(TelecortexThreadManager, TelecortexVirtualManagerMixin):
+
+class TeleCortexVirtualThreadManager(
+    TelecortexThreadManager, TelecortexVirtualManagerMixin
+):
     serial_class = TelecortexVirtualManagerMixin.serial_class
-    session_class =  TelecortexVirtualManagerMixin.session_class
+    session_class = TelecortexVirtualManagerMixin.session_class
     get_serial_conf = TelecortexVirtualManagerMixin.get_serial_conf
+
 
 class TeleCortexCacheManager(TeleCortexBaseManager):
     def __init__(self, servers, cache_file):
@@ -998,12 +1057,23 @@ class TeleCortexCacheManager(TeleCortexBaseManager):
     def session_active(self, server_id):
         return True
 
+
+"""
+Servers is a list of objects containing information about a server's
+configuration.
+"""
+
 SERVERS_DOME = OrderedDict([
-    (0, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4057530', 'baud':DEFAULT_BAUD, 'cid':1}),
-    (1, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4058600', 'baud':DEFAULT_BAUD, 'cid':2}),
-    (2, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'3176950', 'baud':DEFAULT_BAUD, 'cid':3}),
-    (3, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4057540', 'baud':DEFAULT_BAUD, 'cid':4}),
-    (4, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser':'4058621', 'baud':DEFAULT_BAUD, 'cid':5})
+    (0, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4057530',
+         'baud': DEFAULT_BAUD, 'cid': 1}),
+    (1, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4058600',
+         'baud': DEFAULT_BAUD, 'cid': 2}),
+    (2, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '3176950',
+         'baud': DEFAULT_BAUD, 'cid': 3}),
+    (3, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4057540',
+         'baud': DEFAULT_BAUD, 'cid': 4}),
+    (4, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4058621',
+         'baud': DEFAULT_BAUD, 'cid': 5})
 ])
 
 # SERVERS = OrderedDict([
