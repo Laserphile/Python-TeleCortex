@@ -29,12 +29,39 @@ assert sys.version_info > (3, 7), (
 
 class TeleCortexAsyncManagerConfig(TeleCortexManagerConfig):
     """
-    AsyncTeleCortexManagerConfig
-
-    TODO
+    Config for multiple asynchronous sessions.
     """
-    pass
 
+    def setup_loop(self, graphics):
+        """
+        Gather several asyncio coroutines into a loop.
+
+        I'm sorry Jon, this is probably going to make very little sense :(
+        """
+        self.loop = asyncio.get_event_loop()
+        self.loop.set_debug(True)
+        coroutines = []
+        for server_id in self.servers.keys():
+            cmd_queue = asyncio.Queue(10)
+            coroutines.append(serial_asyncio.create_serial_connection(
+                self.loop,
+                functools.partial(
+                    TelecortexSerialProtocol,
+                    cmd_queue,
+                    max_ack_queue=self.args.max_ack_queue,
+                    do_crc=self.args.do_crc,
+                    ignore_acks=self.args.ignore_acks,
+                    chunk_size=self.args.chunk_size,
+                    ser_buf_size=self.args.ser_buf_size
+                ),
+                self.servers[server_id]['file'],
+                baudrate=self.servers[server_id]['baud']
+            ))
+            coroutines.append(
+                graphics(self, server_id, cmd_queue))
+
+        self.loop.run_until_complete(asyncio.gather(*coroutines))
+        return self.loop
 
 # I'm not really sure what's up with this, seems super high level
 class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
@@ -185,14 +212,14 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
 
         logging.debug("set CID to %s" % self.cid)
 
-
     def get_cid(self):
         """
         @overrides TelecortexBaseSession.get_cid
         """
         asyncio.create_task(self.get_cid_async())
 
-async def graphics(cmd_queue):
+
+async def graphics(conf, server_id, cmd_queue):
     # Frame number used for animations
     frameno = 0
     while True:
@@ -229,29 +256,7 @@ def main():
 
     start_time = time_now()
 
-    loop = asyncio.get_event_loop()
-    loop.set_debug(True)
-    # coro = serial.aio.create_serial_connection(
-    cmd_queue = asyncio.Queue(10)
-
-    serial_coro = serial_asyncio.create_serial_connection(
-        loop,
-        functools.partial(
-            TelecortexSerialProtocol,
-            cmd_queue,
-            max_ack_queue=conf.args.max_ack_queue,
-            do_crc=conf.args.do_crc,
-            ignore_acks=conf.args.ignore_acks,
-            chunk_size=conf.args.chunk_size,
-            ser_buf_size=conf.args.ser_buf_size
-        ),
-        conf.servers[0]['file'],
-        baudrate=conf.servers[0]['baud']
-    )
-
-    loop.run_until_complete(asyncio.gather(
-        serial_coro, graphics(cmd_queue)
-    ))
+    loop = conf.setup_loop(graphics)
     loop.run_forever()
     loop.close()
 
