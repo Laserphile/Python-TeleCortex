@@ -136,21 +136,29 @@ class TeleCortexConfig(object):
         self.stream_handler.addFilter(coloredlogs.ProgramNameFilter())
         self.logger.addHandler(self.stream_handler)
 
+    @property
+    def session_kwargs(self):
+        return {
+            'max_ack_queue': self.args.max_ack_queue,
+            'do_crc': self.args.do_crc,
+            'ignore_acks': self.args.ignore_acks,
+            'chunk_size': self.args.chunk_size,
+            'ser_buf_size': self.args.ser_buf_size
+        }
+
 
 class TeleCortexSessionConfig(TeleCortexConfig):
     """
     Config for a single session
     """
+
+    @property
+    def session_class(self):
+        return VirtualTelecortexSession if self.args.virtual \
+            else TelecortexSession
+
     def setup_session(self, ser):
-        session_class = VirtualTelecortexSession if self.args.virtual else TelecortexSession
-        sesh = session_class(
-            ser,
-            max_ack_queue=self.args.max_ack_queue,
-            do_crc=self.args.do_crc,
-            ignore_acks=self.args.ignore_acks,
-            chunk_size=self.args.chunk_size,
-            ser_buf_size=self.args.ser_buf_size
-        )
+        sesh = self.session_class(ser, **self.session_kwargs)
         sesh.reset_board()
         return sesh
 
@@ -166,17 +174,13 @@ class TeleCortexManagerConfig(TeleCortexConfig):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    @property
+    def manager_class(self):
+        return self.virtual_manager_class if self.args.virtual \
+            else self.real_manager_class
+
     def setup_manager(self):
-        manager_class = self.virtual_manager_class if self.args.virtual else self.real_manager_class
-        manager = manager_class(
-            self.servers,
-            max_ack_queue=self.args.max_ack_queue,
-            do_crc=self.args.do_crc,
-            ignore_acks=self.args.ignore_acks,
-            chunk_size=self.args.chunk_size,
-            ser_buf_size=self.args.ser_buf_size
-        )
-        return manager
+        return self.manager_class(self.servers, **self.session_kwargs)
 
 class TeleCortexThreadManagerConfig(TeleCortexManagerConfig):
     real_manager_class = TelecortexThreadManager

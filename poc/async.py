@@ -2,6 +2,7 @@
 
 import asyncio
 import functools
+import itertools
 import logging
 import os
 import re
@@ -20,48 +21,12 @@ import six
 # from serial import aio as serial_aio
 from context import telecortex
 from telecortex.config import TeleCortexManagerConfig
-from telecortex.session import TelecortexBaseSession, TelecortexSession
+from telecortex.session import TeleCortexBaseManager, TelecortexBaseSession
 from telecortex.util import pix_array2text
 
 assert sys.version_info > (3, 7), (
     "must be running Python 3.7 or later to use asyncio")
 
-
-class TeleCortexAsyncManagerConfig(TeleCortexManagerConfig):
-    """
-    Config for multiple asynchronous sessions.
-    """
-
-    def setup_loop(self, graphics):
-        """
-        Gather several asyncio coroutines into a loop.
-
-        I'm sorry Jon, this is probably going to make very little sense :(
-        """
-        self.loop = asyncio.get_event_loop()
-        self.loop.set_debug(True)
-        coroutines = []
-        for server_id in self.servers.keys():
-            cmd_queue = asyncio.Queue(10)
-            coroutines.append(serial_asyncio.create_serial_connection(
-                self.loop,
-                functools.partial(
-                    TelecortexSerialProtocol,
-                    cmd_queue,
-                    max_ack_queue=self.args.max_ack_queue,
-                    do_crc=self.args.do_crc,
-                    ignore_acks=self.args.ignore_acks,
-                    chunk_size=self.args.chunk_size,
-                    ser_buf_size=self.args.ser_buf_size
-                ),
-                self.servers[server_id]['file'],
-                baudrate=self.servers[server_id]['baud']
-            ))
-            coroutines.append(
-                graphics(self, server_id, cmd_queue))
-
-        self.loop.run_until_complete(asyncio.gather(*coroutines))
-        return self.loop
 
 # I'm not really sure what's up with this, seems super high level
 class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
@@ -218,6 +183,121 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         """
         asyncio.create_task(self.get_cid_async())
 
+class TelecortexAsyncManager(TeleCortexBaseManager):
+    """
+    Manages TelecortexSerialProtocol objects in an async loop.
+    """
+    protocol_class = TelecortexSerialProtocol
+
+    def __init__(self, conf, graphics, **kwargs):
+        self.queue_len = kwargs.pop('queue_len', 10)
+        self.conf = conf
+        self.graphics = graphics
+        super(TelecortexAsyncManager, self).__init__(conf.servers, **kwargs)
+        # asyncio.Queues for sending commands to each server.
+        self.cmd_queues = OrderedDict()
+        # asyncio coroutines controlling each serial device
+        self.sesh_coroutines = OrderedDict()
+        # asyncio coroutines sending graphics to each serial coroutine
+        self.gfx_coroutines = OrderedDict()
+        # A tuple of (queue, sesh, gfx) for each server_id
+        self.workers = OrderedDict()
+        self.loop = asyncio.get_event_loop()
+        self.loop.set_debug(True)
+        self.refresh_connections()
+
+    @classmethod
+    def open_sesh(cls, serial_kwargs, session_kwargs):
+        """
+        @overrides TeleCortexBaseManager.open_sesh.
+        """
+        return
+
+    def refresh_connections(self, server_ids=None):
+        if server_ids is None:
+            server_ids = self.servers.keys()
+        else:
+            raise UserWarning("individual server refresh not supported")
+
+        assert sys.version_info > (3, 7), (
+            "async only works properly on python 3.7")
+
+        for server_id, server_info in self.servers.items():
+            if server_id not in self.cmd_queues:
+                self.cmd_queues[server_id] = asyncio.Queue(self.queue_len)
+
+            if server_id in self.sesh_coroutines:
+                self.sesh_coroutines[server_id].cancel()
+            serial_kwargs = self.get_serial_conf(server_info)
+            serial_url = serial_kwargs.pop('port')
+            coro = serial_asyncio.create_serial_connection(
+                self.loop,
+                functools.partial(
+                    self.protocol_class,
+                    self.cmd_queues[server_id],
+                    **self.session_kwargs
+                ),
+                serial_url,
+                **serial_kwargs
+            )
+            self.sesh_coroutines[server_id] = coro
+
+            if server_id not in self.gfx_coroutines:
+                self.gfx_coroutines[server_id] = graphics(
+                    self.conf, server_id, self.cmd_queues[server_id])
+
+        self.loop.run_until_complete(asyncio.gather(*itertools.chain(
+            self.sesh_coroutines.values(),
+            self.gfx_coroutines.values()
+        )))
+
+
+class TeleCortexAsyncManagerConfig(TeleCortexManagerConfig):
+    """
+    Config for multiple asynchronous sessions.
+    """
+    real_manager_class = TelecortexAsyncManager
+
+    def __init__(self, graphics, *args, **kwargs):
+        self.graphics = graphics
+        super().__init__(*args, **kwargs)
+
+    def setup_manager(self):
+        return self.manager_class(
+            self,
+            self.graphics,
+            **self.session_kwargs
+        )
+
+    # def setup_loop(self, graphics):
+    #     """
+    #     Gather several asyncio coroutines into a loop.
+    #
+    #     Sorry Jon, this is probably going to make very little sense :(
+    #     """
+    #     coroutines = []
+    #     for server_id in self.servers.keys():
+    #         cmd_queue = asyncio.Queue(10)
+    #         coroutines.append(serial_asyncio.create_serial_connection(
+    #             self.loop,
+    #             functools.partial(
+    #                 TelecortexSerialProtocol,
+    #                 cmd_queue,
+    #                 max_ack_queue=self.args.max_ack_queue,
+    #                 do_crc=self.args.do_crc,
+    #                 ignore_acks=self.args.ignore_acks,
+    #                 chunk_size=self.args.chunk_size,
+    #                 ser_buf_size=self.args.ser_buf_size
+    #             ),
+    #             self.servers[server_id]['file'],
+    #             baudrate=self.servers[server_id]['baud']
+    #         ))
+    #         coroutines.append(
+    #             graphics(self, server_id, cmd_queue))
+    #
+    #     self.loop.run_until_complete(*coroutines)
+    #     self.loop.run_forever()
+    #     self.loop.close()
 
 async def graphics(conf, server_id, cmd_queue):
     # Frame number used for animations
@@ -247,7 +327,8 @@ def main():
         name="async",
         description=(
             "Asynchronous Management of Telecortex Controllers"),
-        default_config='dome_overhead'
+        default_config='dome_overhead',
+        graphics=graphics
     )
 
     conf.parse_args()
@@ -256,9 +337,10 @@ def main():
 
     start_time = time_now()
 
-    loop = conf.setup_loop(graphics)
-    loop.run_forever()
-    loop.close()
+    manager = conf.setup_manager()
+
+    manager.loop.run_forever()
+    manager.loop.close()
 
 
 if __name__ == '__main__':

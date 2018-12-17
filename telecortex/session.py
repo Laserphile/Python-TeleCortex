@@ -167,12 +167,11 @@ class TelecortexLineCommand(TelecortexCommand):
 
 class TelecortexBaseSession(object):
     """
-    Manages a abstract session with a Telecortex device.
+    Abstract interface for a session with a Telecortex device.
 
     When commands are sent that require acknowledgement (with linenum),
     they are queued in ack_queue until the acknowledgement or error for that
     command is received.
-    When
     """
     re_error = r"^E(?P<errnum>\d+):\s*(?P<err>.*)"
     re_line = r"^N(?P<linenum>\d+)"
@@ -244,6 +243,12 @@ class TelecortexBaseSession(object):
     def reset_board(self):
         """
         Software reset the controller
+        """
+        raise NotImplementedError()
+
+    def close(self):
+        """
+        Close the connection to the controller
         """
         raise NotImplementedError()
 
@@ -734,10 +739,13 @@ class ThreadedTelecortexSession(TelecortexSession):
         # TODO: actually relinquish
         time.sleep(0.01)
 
-
+# TODO: rename TelecortexBaseManager
 class TeleCortexBaseManager(object):
-    serial_class = serial.Serial
+    """
+    Manage multiple TelecortexSession objects.
+    """
     session_class = TelecortexSession
+    serial_class = serial.Serial
 
     def __init__(self, servers, **kwargs):
         self.servers = servers
@@ -745,30 +753,37 @@ class TeleCortexBaseManager(object):
         self.session_kwargs = kwargs
 
     @classmethod
-    def relinquish(cls):
-        time.sleep(0.005)
+    def open_sesh(cls, serial_kwargs, session_kwargs):
+        """
+        Open a serial connection and create a session object.
+        """
+        ser = cls.serial_class(**serial_kwargs)
+        sesh = cls.session_class(ser, **session_kwargs)
+        return sesh
 
     def get_serial_conf(self, server_info):
+        """
+        Determine the arguments to give to serial.Serial from server_info.
+
+        May have to make connections to devices in order to determine CID if
+        device file is not given.
+        """
+        response = {
+            'baudrate': server_info.get('baud', DEFAULT_BAUD),
+            'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
+        }
         if 'file' in server_info:
-            return {
-                'file': server_info.get('file'),
-                'baud': server_info.get('baud', DEFAULT_BAUD),
-                'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
-            }
+            response['port'] = server_info['file']
+            return response
 
         dev_kwargs = {}
         for key in ['vid', 'pid', 'ser', 'dev']:
+            if IGNORE_SERIAL_NO and key in ['ser']:
+                continue
+            if IGNORE_VID_PID and key in ['vid', 'pid']:
+                continue
             if key in server_info:
                 dev_kwargs[key] = server_info[key]
-
-        if IGNORE_SERIAL_NO:
-            if 'ser' in dev_kwargs:
-                del dev_kwargs['ser']
-        if IGNORE_VID_PID:
-            if 'vid' in dev_kwargs:
-                del dev_kwargs['vid']
-            if 'pid' in dev_kwargs:
-                del dev_kwargs['pid']
 
         ports = query_serial_dev(**dev_kwargs)
 
@@ -782,18 +797,15 @@ class TeleCortexBaseManager(object):
                     if cid != server_info.get('cid'):
                         continue
                 else:
-                    ser = self.serial_class(
-                        port=port,
-                        baudrate=server_info.get('baud', DEFAULT_BAUD),
-                        timeout=server_info.get('timeout', DEFAULT_TIMEOUT)
-                    )
-                    sesh = self.session_class(ser)
+                    serial_kwargs = response.copy()
+                    serial_kwargs['port'] = port
+                    sesh = self.open_sesh(serial_kwargs, self.session_kwargs)
                     sesh.reset_board()
                     if server_info.get('cid') is not None:
-                        cid = int(sesh.get_cid())
-                        self.known_cids[port] = cid
-                        if cid != server_info.get('cid'):
-                            ser.close()
+                        sesh_cid = int(sesh.get_cid())
+                        self.known_cids[port] = sesh_cid
+                        if sesh_cid != server_info.get('cid'):
+                            sesh.close()
                             continue
                 ports_matching_cid.append(port)
             ports = ports_matching_cid
@@ -805,16 +817,11 @@ class TeleCortexBaseManager(object):
                 )
             )
 
-        response = {
-            'baud': server_info.get('baud', DEFAULT_BAUD),
-            'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
-        }
-
         if not ports:
             logging.critical(
                 "target device not found for server: %s" % server_info)
             return {}
-        response['file'] = ports[0]
+        response['port'] = ports[0]
 
         return response
 
@@ -824,9 +831,11 @@ class TeleCortexBaseManager(object):
     def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
         raise NotImplementedError()
 
-
+# TODO: rename TelecortexSyncManager, as in opposite of async
 class TelecortexSessionManager(TeleCortexBaseManager):
-
+    """
+    Manage TelecortexSession objects in a single thread.
+    """
     def __init__(self, servers, **kwargs):
         super(TelecortexSessionManager, self).__init__(servers, **kwargs)
         self.sessions = OrderedDict()
@@ -857,12 +866,7 @@ class TelecortexSessionManager(TeleCortexBaseManager):
             serial_conf = self.get_serial_conf(server_info)
 
             if serial_conf:
-                ser = self.serial_class(
-                    port=serial_conf['file'],
-                    baudrate=serial_conf['baud'],
-                    timeout=serial_conf['timeout'],
-                )
-                sesh = self.session_class(ser, **self.session_kwargs)
+                sesh = self.open_sesh(serial_conf, self.session_kwargs)
                 sesh.reset_board()
                 logging.warning("added session for server: %s" % server_info)
                 self.sessions[server_id] = sesh
@@ -889,8 +893,8 @@ class TelecortexVirtualManagerMixin(object):
 
     def get_serial_conf(self, server_info):
         return {
-            'file': server_info.get('file', "VIRTUAL"),
-            'baud': server_info.get('baud', DEFAULT_BAUD),
+            'port': server_info.get('file', "VIRTUAL"),
+            'baudrate': server_info.get('baud', DEFAULT_BAUD),
             'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
         }
 
@@ -904,28 +908,28 @@ class TelecortexVirtualManager(
 
 
 class TelecortexThreadManager(TeleCortexBaseManager):
+    """
+    Manage TelecortexSession objects in multiple threads.
+    """
     session_class = ThreadedTelecortexSession
 
     queue_length = 10
 
     def __init__(self, servers, **kwargs):
         super(TelecortexThreadManager, self).__init__(servers, **kwargs)
+        # A tuple of (queue, proc) for each server_id
         self.threads = OrderedDict()
         self.refresh_connections()
 
     @classmethod
+    def relinquish(cls):
+        time.sleep(0.005)
+
+    @classmethod
     def controller_thread(cls, serial_conf, queue_, session_kwargs):
         # setup serial device
-        ser = cls.serial_class(
-            port=serial_conf['file'],
-            baudrate=serial_conf['baud'],
-            timeout=serial_conf['timeout'],
-            xonxoff=False,
-            # rtscts=True,
-            # dsrdtr=True
-        )
-        logging.debug("setting up serial sesh: %s" % ser)
-        sesh = cls.session_class(ser, **session_kwargs)
+
+        sesh = cls.open_sesh(serial_conf, session_kwargs)
         sesh.reset_board()
         sesh.get_cid()
         # listen for commands
@@ -956,15 +960,16 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         ctx = mp.get_context('fork')
 
         for server_id in server_ids:
-            server_info = self.threads.get(server_id, (None, None))
-            if server_info[1]:
-                server_info[1].terminate()
+            queue, old_proc = self.threads.get(server_id, (None, None))
+            if old_proc is not None:
+                old_proc.terminate()
 
             server_info = self.servers.get(server_id, {})
             serial_conf = self.get_serial_conf(server_info)
 
             if serial_conf:
-                queue = mp.Queue(self.queue_length)
+                if queue is None:
+                    queue = mp.Queue(self.queue_length)
 
                 proc = ctx.Process(
                     target=self.controller_thread,
