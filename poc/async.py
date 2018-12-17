@@ -50,7 +50,7 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
     Generate an asyncio.StreamReader/asyncio.StreamWriter pair.
     """
     def __init__(self, queue_, linecount=0, *args, **kwargs):
-        asyncio.Protocol.__init__(self, *args, **kwargs)
+        asyncio.Protocol.__init__(self)
         TelecortexBaseSession.__init__(self, *args, **kwargs)
         # Asyncio queue containing commands to be run
         self.cmd_queue = queue_
@@ -76,8 +76,11 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
 
     async def cmd_queue_loop(self):
         while True:
-            cmd, args, payload = await self.cmd_queue.get()
-            self.chunk_payload_with_linenum(cmd, args, payload)
+            try:
+                cmd, args, payload = await self.cmd_queue.get()
+                self.chunk_payload_with_linenum(cmd, args, payload)
+            except Exception as exc:
+                logging.error(exc)
 
     def data_received(self, data):
         """
@@ -122,6 +125,7 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         """
         Async here because Serial.write blocks?
         """
+        logging.debug("sending text: %s" % repr(text))
         if not text[-1] == '\n':
             text = text + '\n'
         # bytes_ = six.binary_type(text, 'latin-1')
@@ -129,6 +133,11 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         bytes_ = converters.to_bytes(text)
         self.transport.serial.write(bytes_)
         return len(bytes_)
+
+    # def write_line(self, text):
+    #     """
+    #     """
+    #     asyncio.create_task(
 
     def send_cmd_obj(self, cmd_obj):
         """
@@ -163,7 +172,8 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         linenum = self.linecount
         self.send_cmd_with_linenum("P2205")
         while linenum not in self.responses:
-            logging.debug('%d not in responses: %s' % (linenum, self.responses,))
+            logging.debug(
+                '%d not in responses: %s' % (linenum, self.responses,))
             await asyncio.sleep(0.1)
         response = self.responses.get(linenum)
 
@@ -173,6 +183,8 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
                 linenum, response)
         self.cid = response[1:]
 
+        logging.debug("set CID to %s" % self.cid)
+
 
     def get_cid(self):
         """
@@ -181,15 +193,24 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         asyncio.create_task(self.get_cid_async())
 
 async def graphics(cmd_queue):
+    # Frame number used for animations
+    frameno = 0
     while True:
         for panel in range(4):
             logging.debug("putting M2603")
             pixel_str = pix_array2text(
-                0, 255, 127
+                frameno, 255, 127
             )
             await cmd_queue.put(
                 ("M2603", {"Q": panel}, pixel_str)
             )
+        await cmd_queue.put(
+            ("M2610", None, None)
+        )
+        await asyncio.sleep(0.01)
+
+        # increment frame number
+        frameno = (frameno + 1) % 255
 
 
 def main():
@@ -215,7 +236,15 @@ def main():
 
     serial_coro = serial_asyncio.create_serial_connection(
         loop,
-        functools.partial(TelecortexSerialProtocol, cmd_queue),
+        functools.partial(
+            TelecortexSerialProtocol,
+            cmd_queue,
+            max_ack_queue=conf.args.max_ack_queue,
+            do_crc=conf.args.do_crc,
+            ignore_acks=conf.args.ignore_acks,
+            chunk_size=conf.args.chunk_size,
+            ser_buf_size=conf.args.ser_buf_size
+        ),
         conf.servers[0]['file'],
         baudrate=conf.servers[0]['baud']
     )
