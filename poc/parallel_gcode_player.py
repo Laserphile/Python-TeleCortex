@@ -18,8 +18,6 @@ import numpy as np
 from context import telecortex
 from mss import mss
 from telecortex.config import TeleCortexThreadManagerConfig
-from telecortex.session import DEFAULT_BAUD, DEFAULT_TIMEOUT, PANEL_LENGTHS
-from telecortex.session import SERVERS_BLANK as SERVERS
 from telecortex.util import pix_array2text
 
 TARGET_FRAMERATE = 20

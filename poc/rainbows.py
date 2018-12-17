@@ -11,7 +11,7 @@ import serial
 
 from context import telecortex
 from telecortex.config import TeleCortexSessionConfig
-from telecortex.session import DEFAULT_BAUD, TEENSY_VID, find_serial_dev
+from telecortex.ser import DEFAULT_BAUD, TEENSY_VID, find_serial_dev
 from telecortex.util import pix_array2text
 
 

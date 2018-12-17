@@ -8,21 +8,20 @@ from collections import OrderedDict
 from datetime import datetime
 from time import time as time_now
 
-import serial
-
 import coloredlogs
 import cv2
 import numpy as np
-from context import telecortex
+import serial
 from mss import mss
+
+from context import telecortex
 from telecortex.config import TeleCortexConfig
 from telecortex.interpolation import interpolate_pixel_map
+from telecortex.manage import TeleCortexCacheManager
 from telecortex.mapping import (PANELS_PER_CONTROLLER, draw_map,
                                 normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transform_panel_map, transpose_mapping)
-from telecortex.session import (DEFAULT_BAUD, DEFAULT_TIMEOUT, PANEL_LENGTHS,
-                                TeleCortexCacheManager, TelecortexSession)
 from telecortex.util import pix_array2text
 
 TARGET_FRAMERATE = 20

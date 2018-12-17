@@ -5,24 +5,21 @@ import logging
 import os
 from collections import OrderedDict
 from datetime import datetime
-from time import time as time_now
 from pprint import pformat
+from time import time as time_now
 
 import coloredlogs
 import cv2
 import numpy as np
 from mss import mss
+
 # noinspection PyUnresolvedReferences
 from context import telecortex
-from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
-                                normalize_pix_map, rotate_mapping, scale_mapping, rotate_vector,
-                                transpose_mapping, draw_map)
-from telecortex.mapping import MAPS_DOME, transform_panel_map
-from telecortex.session import TelecortexSessionManager
-from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexManagerConfig
-
+from telecortex.interpolation import interpolate_pixel_map
+from telecortex.manage import TelecortexSessionManager
+from telecortex.mapping import draw_map
+from telecortex.util import pix_array2text
 
 TARGET_FRAMERATE = 20
 MAIN_WINDOW = 'image_window'

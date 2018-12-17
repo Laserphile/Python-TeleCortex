@@ -23,7 +23,7 @@ from telecortex.mapping import PIXEL_MAP_SMOL as PIXEL_MAP_DOME_SMOL
 from telecortex.mapping import (draw_map, normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
-from telecortex.session import TelecortexSession, TelecortexThreadManager
+from telecortex.session import TelecortexSession
 from telecortex.util import pix_array2text
 from telecortex.config import TeleCortexThreadManagerConfig
 

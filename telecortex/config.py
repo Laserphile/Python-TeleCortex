@@ -2,22 +2,25 @@ import argparse
 import logging
 import os
 import re
+import sys
 from builtins import super
 from pprint import pformat, pprint
 
 import coloredlogs
+
+from telecortex.manage import (TelecortexAsyncManager,
+                               TelecortexSessionManager,
+                               TelecortexThreadManager,
+                               TelecortexVirtualManager,
+                               TeleCortexVirtualThreadManager)
 from telecortex.mapping import (MAPS_DOME_DJ, MAPS_DOME_OVERHEAD,
                                 MAPS_DOME_SIMPLIFIED, MAPS_DOME_TRIFORCE,
                                 MAPS_GOGGLE, MAPS_TRIFORCE, PANELS_DOME_DJ,
                                 PANELS_DOME_OVERHEAD, PANELS_DOME_SIMPLIFIED,
                                 PANELS_DOME_TRIFORCE, PANELS_GOGGLE,
                                 PANELS_TRIFORCE)
-from telecortex.session import (SERVERS_DOME, SERVERS_SINGLE,
-                                TelecortexSession, TelecortexSessionManager,
-                                TelecortexThreadManager,
-                                TelecortexVirtualManager,
-                                TeleCortexVirtualThreadManager,
-                                VirtualTelecortexSession)
+from telecortex.ser import SERVERS_DOME, SERVERS_SINGLE
+from telecortex.session import TelecortexSession, VirtualTelecortexSession
 
 
 class TeleCortexConfig(object):
@@ -185,3 +188,21 @@ class TeleCortexManagerConfig(TeleCortexConfig):
 class TeleCortexThreadManagerConfig(TeleCortexManagerConfig):
     real_manager_class = TelecortexThreadManager
     virtual_manager_class = TeleCortexVirtualThreadManager
+
+
+class TeleCortexAsyncManagerConfig(TeleCortexManagerConfig):
+    """
+    Config for multiple asynchronous sessions.
+    """
+    real_manager_class = TelecortexAsyncManager
+
+    def __init__(self, graphics, *args, **kwargs):
+        self.graphics = graphics
+        super().__init__(*args, **kwargs)
+
+    def setup_manager(self):
+        return self.manager_class(
+            self,
+            self.graphics,
+            **self.session_kwargs
+        )

@@ -7,13 +7,13 @@ from collections import OrderedDict
 from datetime import datetime
 from time import time as time_now
 
-import serial
-
 import coloredlogs
 import cv2
 import numpy as np
-from context import telecortex
+import serial
 from mss import mss
+
+from context import telecortex
 from telecortex.config import TeleCortexThreadManagerConfig
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import PANELS_PER_CONTROLLER, draw_map

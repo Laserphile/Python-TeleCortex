@@ -14,16 +14,14 @@ from time import time as time_now
 import coloredlogs
 import cv2
 import numpy as np
+
 from context import telecortex
 from telecortex.config import TeleCortexManagerConfig
 from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
 from telecortex.interpolation import interpolate_pixel_map
+from telecortex.manage import TelecortexSessionManager
 from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
-                                normalize_pix_map, rotate_mapping,
-                                rotate_vector, scale_mapping,
-                                transform_panel_map, transpose_mapping)
-from telecortex.session import TelecortexSessionManager
+from telecortex.mapping import draw_map
 from telecortex.util import pix_array2text
 
 TARGET_FRAMERATE = 20

@@ -22,7 +22,7 @@ from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
                                 normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
-from telecortex.session import TelecortexSessionManager
+from telecortex.manage import TelecortexSessionManager
 from telecortex.util import pix_array2text
 
 TARGET_FRAMERATE = 20

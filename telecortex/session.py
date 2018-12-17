@@ -1,10 +1,10 @@
 from __future__ import unicode_literals
 
+import asyncio
 import base64
 import itertools
 import json
 import logging
-import multiprocessing as mp
 import os
 import queue
 import re
@@ -20,93 +20,19 @@ from time import time as time_now
 import coloredlogs
 import serial
 from kitchen.text import converters
-from serial.tools import list_ports
 
+import serial_asyncio
 import six
+from context import telecortex
+from telecortex.ser import (DEFAULT_BAUD, DEFAULT_TIMEOUT, IGNORE_SERIAL_NO,
+                            IGNORE_VID_PID, TEENSY_VID, find_serial_dev,
+                            query_serial_dev)
 
 # TODO: soft reset when linenum approach long int so it can run forever
 
-# to get these values:
-# pip install pyserial
-# python -m serial.tools.list_ports --verbose
-
-DEFAULT_BAUD = 1000000
-DEFAULT_TIMEOUT = 1
-
-# Fix for this issue:
-IGNORE_SERIAL_NO = True
-IGNORE_VID_PID = False
-
-TEENSY_VID = 0x16C0
 PANEL_LENGTHS = [
     316, 260, 260, 260
 ]
-
-
-def find_serial_dev(vid=None, pid=None, ser=None):
-    """
-    Given a Vendor ID and (optional) Product ID, enumerate the serial ports
-    until a matching device is found.
-    """
-    logging.debug(
-        "Checking for: VID: %s, PID: %s, SER: %s",
-        repr(vid), repr(pid), repr(ser)
-    )
-    for port_info in list_ports.comports():
-        logging.debug(
-            "found a device: \ninfo: %s\nvars: %s",
-            port_info.usb_info(),
-            vars(port_info)
-        )
-        if vid is not None and port_info.vid != vid:
-            logging.debug("vid not match %s | %s", vid, port_info.vid)
-            continue
-        if pid is not None and port_info.pid != pid:
-            logging.debug("pid not match %s | %s", pid, port_info.pid)
-            continue
-        if ser is not None and port_info.serial_number != str(ser):
-            logging.debug(
-                "ser not match %s | %s", ser, port_info.serial_number)
-            continue
-        logging.info("found target device: %s" % port_info.device)
-        target_device = port_info.device
-        return target_device
-
-
-def query_serial_dev(vid=None, pid=None, ser=None, dev=None):
-    """
-    Given a Vendor ID and (optional) Product ID, return the serial ports which
-    match these parameters
-    """
-    logging.debug(
-        "Querying for: VID: %s, PID: %s, SER: %s, DEV: %s",
-        repr(vid), repr(pid), repr(ser), repr(dev)
-    )
-    matching_devs = []
-    for port_info in list_ports.comports():
-        logging.debug(
-            "found a device: \ninfo: %s\nvars: %s",
-            port_info.usb_info(),
-            vars(port_info)
-        )
-        if vid is not None and port_info.vid != vid:
-            logging.debug("vid not match %s | %s", vid, port_info.vid)
-            continue
-        if pid is not None and port_info.pid != pid:
-            logging.debug("pid not match %s | %s", pid, port_info.pid)
-            continue
-        if ser is not None and port_info.serial_number != str(ser):
-            logging.debug(
-                "ser not match %s | %s", ser, port_info.serial_number)
-            continue
-        if dev is not None and port_info.device != dev:
-            logging.debug(
-                "dev not match %s | %s", ser, port_info.serial_number)
-            continue
-        logging.info("found target device: %s" % port_info.device)
-        target_device = port_info.device
-        matching_devs.append(target_device)
-    return matching_devs
 
 
 class TelecortexCommand(object):
@@ -739,397 +665,160 @@ class ThreadedTelecortexSession(TelecortexSession):
         # TODO: actually relinquish
         time.sleep(0.01)
 
-# TODO: rename TelecortexBaseManager
-class TeleCortexBaseManager(object):
-    """
-    Manage multiple TelecortexSession objects.
-    """
-    session_class = TelecortexSession
-    serial_class = serial.Serial
 
-    def __init__(self, servers, **kwargs):
-        self.servers = servers
-        self.known_cids = OrderedDict()
-        self.session_kwargs = kwargs
+class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
+    """
+    A serial protocol, which uses a `serial_asyncio.SerialTransport`, is
+    generally responsible for telling the transport what to write, and for
+    interpreting the data coming from the transport.
 
-    @classmethod
-    def open_sesh(cls, serial_kwargs, session_kwargs):
+    See: https://tinkering.xyz/async-serial/
+
+    TODO:
+
+    Generate an asyncio.StreamReader/asyncio.StreamWriter pair.
+    """
+    def __init__(self, queue_, linecount=0, *args, **kwargs):
+        asyncio.Protocol.__init__(self)
+        TelecortexBaseSession.__init__(self, *args, **kwargs)
+        # Asyncio queue containing commands to be run
+        self.cmd_queue = queue_
+
+    def connection_made(self, transport):
         """
-        Open a serial connection and create a session object.
+        Provide Asyncio with Callback for when serial is connected.
         """
-        ser = cls.serial_class(**serial_kwargs)
-        sesh = cls.session_class(ser, **session_kwargs)
-        return sesh
+        assert isinstance(transport, serial_asyncio.SerialTransport), \
+            "expected `serial_asyncio.SerialTransport` transport"
+        self.transport = transport
+        logging.debug('port opened: %s' % transport)
+        # You can manipulate Serial object via transport
+        # transport.serial.rts = False
+        # Write serial data via transport
+        # transport.write(b'Hello, World!\n')
 
-    def get_serial_conf(self, server_info):
-        """
-        Determine the arguments to give to serial.Serial from server_info.
+        self.reset_board()
 
-        May have to make connections to devices in order to determine CID if
-        device file is not given.
-        """
-        response = {
-            'baudrate': server_info.get('baud', DEFAULT_BAUD),
-            'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
-        }
-        if 'file' in server_info:
-            response['port'] = server_info['file']
-            return response
+        self.get_cid()
 
-        dev_kwargs = {}
-        for key in ['vid', 'pid', 'ser', 'dev']:
-            if IGNORE_SERIAL_NO and key in ['ser']:
-                continue
-            if IGNORE_VID_PID and key in ['vid', 'pid']:
-                continue
-            if key in server_info:
-                dev_kwargs[key] = server_info[key]
+        asyncio.create_task(self.cmd_queue_loop())
 
-        ports = query_serial_dev(**dev_kwargs)
-
-        if 'cid' in server_info:
-            ports_matching_cid = []
-
-            for port in ports:
-                cid = None
-                if port in self.known_cids:
-                    cid = self.known_cids[port]
-                    if cid != server_info.get('cid'):
-                        continue
-                else:
-                    serial_kwargs = response.copy()
-                    serial_kwargs['port'] = port
-                    sesh = self.open_sesh(serial_kwargs, self.session_kwargs)
-                    sesh.reset_board()
-                    if server_info.get('cid') is not None:
-                        sesh_cid = int(sesh.get_cid())
-                        self.known_cids[port] = sesh_cid
-                        if sesh_cid != server_info.get('cid'):
-                            sesh.close()
-                            continue
-                ports_matching_cid.append(port)
-            ports = ports_matching_cid
-
-        if len(ports) > 1:
-            logging.warning(
-                "ambiguous server info matches multiple ports: %s | %s" % (
-                    server_info, ports
-                )
-            )
-
-        if not ports:
-            logging.critical(
-                "target device not found for server: %s" % server_info)
-            return {}
-        response['port'] = ports[0]
-
-        return response
-
-    def all_idle(self):
-        raise NotImplementedError()
-
-    def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
-        raise NotImplementedError()
-
-# TODO: rename TelecortexSyncManager, as in opposite of async
-class TelecortexSessionManager(TeleCortexBaseManager):
-    """
-    Manage TelecortexSession objects in a single thread.
-    """
-    def __init__(self, servers, **kwargs):
-        super(TelecortexSessionManager, self).__init__(servers, **kwargs)
-        self.sessions = OrderedDict()
-        self.refresh_connections()
-
-    def refresh_connections(self):
-        """
-        Use information from `self.servers`, ensure all sessions are connected.
-        """
-        for server_id, server_info in self.servers.items():
-            logging.info(
-                "looking for server_id %d with info: %s" %
-                (server_id, server_info)
-            )
-            if server_id in self.sessions:
-                if self.sessions[server_id]:
-                    # we're fine
-                    continue
-                if not self.sessions[server_id]:
-                    # session is dead, kill it
-                    self.sessions[server_id].close()
-                    del self.sessions[server_id]
-
-            if self.sessions.get(server_id) is not None:
-                continue
-
-            # if session does not exist, create a new one
-            serial_conf = self.get_serial_conf(server_info)
-
-            if serial_conf:
-                sesh = self.open_sesh(serial_conf, self.session_kwargs)
-                sesh.reset_board()
-                logging.warning("added session for server: %s" % server_info)
-                self.sessions[server_id] = sesh
-
-    def close(self):
-        for server_id, session in self.sessions.items():
-            session.close()
-        self.sessions = OrderedDict()
-
-    def __enter__(self, *args, **kwargs):
-        # TODO: this
-        pass
-
-    def __exit__(self, *args, **kwargs):
-        self.close()
-
-
-class TelecortexVirtualManagerMixin(object):
-    """
-    Don't actually create any connections
-    """
-    serial_class = dict
-    session_class = VirtualTelecortexSession
-
-    def get_serial_conf(self, server_info):
-        return {
-            'port': server_info.get('file', "VIRTUAL"),
-            'baudrate': server_info.get('baud', DEFAULT_BAUD),
-            'timeout': server_info.get('timeout', DEFAULT_TIMEOUT)
-        }
-
-
-class TelecortexVirtualManager(
-    TelecortexSessionManager, TelecortexVirtualManagerMixin
-):
-    serial_class = TelecortexVirtualManagerMixin.serial_class
-    session_class = TelecortexVirtualManagerMixin.session_class
-    get_serial_conf = TelecortexVirtualManagerMixin.get_serial_conf
-
-
-class TelecortexThreadManager(TeleCortexBaseManager):
-    """
-    Manage TelecortexSession objects in multiple threads.
-    """
-    session_class = ThreadedTelecortexSession
-
-    queue_length = 10
-
-    def __init__(self, servers, **kwargs):
-        super(TelecortexThreadManager, self).__init__(servers, **kwargs)
-        # A tuple of (queue, proc) for each server_id
-        self.threads = OrderedDict()
-        self.refresh_connections()
-
-    @classmethod
-    def relinquish(cls):
-        time.sleep(0.005)
-
-    @classmethod
-    def controller_thread(cls, serial_conf, queue_, session_kwargs):
-        # setup serial device
-
-        sesh = cls.open_sesh(serial_conf, session_kwargs)
-        sesh.reset_board()
-        sesh.get_cid()
-        # listen for commands
-        while sesh:
+    async def cmd_queue_loop(self):
+        while True:
             try:
-                cmd, args, payload = queue_.get_nowait()
-            except queue.Empty as exc:
-                logging.info("Queue Empty: %s | %s" % (sesh.cid, exc))
-                # TODO: relinquish control to other threads
-                cls.relinquish()
-                continue
+                cmd, args, payload = await self.cmd_queue.get()
+                self.chunk_payload_with_linenum(cmd, args, payload)
             except Exception as exc:
                 logging.error(exc)
-                continue
-            # logging.debug("received: %s" % str((cmd, args, payload)))
-            sesh.chunk_payload_with_linenum(cmd, args, payload)
-            while not sesh.ready:
-                logging.debug("sesh not ready: %s" % sesh.cid)
-                # TODO: relinquish control here
-                cls.relinquish()
 
-    def refresh_connections(self, server_ids=None):
-        if server_ids is None:
-            server_ids = self.servers.keys()
+    def data_received(self, data):
+        """
+        Provide Asyncio with Callback for when data is received.
+        """
+        logging.debug('data received %s' % repr(data))
+        self.line_buffer += converters.to_unicode(data)
 
-        assert sys.version_info > (3, 0), (
-            "multiprocessing only works properly on python 3")
-        ctx = mp.get_context('fork')
+        if '\n' in self.line_buffer:
+            lines = re.split(r"[\r\n]+", self.line_buffer)
+            self.line_queue.extend(lines[:-1])
+            self.line_buffer = lines[-1]
 
-        for server_id in server_ids:
-            queue, old_proc = self.threads.get(server_id, (None, None))
-            if old_proc is not None:
-                old_proc.terminate()
+        self.parse_responses()
 
-            server_info = self.servers.get(server_id, {})
-            serial_conf = self.get_serial_conf(server_info)
+    def get_line(self):
+        """
+        @overrides TelecortexBaseSession.get_line
+        """
+        if self.line_queue:
+            line = self.line_queue.popleft()
+            logging.debug("received line: %s" % line)
+            self.last_line = line
+            return line
 
-            if serial_conf:
-                if queue is None:
-                    queue = mp.Queue(self.queue_length)
+    def connection_lost(self, exc):
+        """
+        Provide Asyncio with Callback for when serial is disconnected.
+        """
+        logging.warning('port closed')
+        self.transport.loop.stop()
 
-                proc = ctx.Process(
-                    target=self.controller_thread,
-                    args=(serial_conf, queue, self.session_kwargs),
-                    name="controller_%s" % server_id
-                )
-                proc.start()
-                self.threads[server_id] = (queue, proc)
+    # def pause_writing(self):
+    #     logging.debug('pause writing')
+    #     logging.debug(self.transport.get_write_buffer_size())
+    #
+    # def resume_writing(self):
+    #     logging.debug(self.transport.get_write_buffer_size())
+    #     logging.debug('resume writing')
 
-    @property
-    def any_alive(self):
-        return any([self.threads.get(server_id, (None, None))[1]
-                    for server_id in self.servers.keys()])
+    async def write_line_async(self, text):
+        """
+        Async here because Serial.write blocks?
+        """
+        logging.debug("sending text: %s" % repr(text))
+        if not text[-1] == '\n':
+            text = text + '\n'
+        # bytes_ = six.binary_type(text, 'latin-1')
+        # bytes_ = text.encode('utf8')
+        bytes_ = converters.to_bytes(text)
+        self.transport.serial.write(bytes_)
+        return len(bytes_)
 
-    def session_active(self, server_id):
-        return self.threads.get(server_id)
+    # def write_line(self, text):
+    #     """
+    #     """
+    #     asyncio.create_task(
 
-    @property
-    def all_idle(self):
-        return all([queue.empty() for (queue, proc) in self.threads.values()])
+    def send_cmd_obj(self, cmd_obj):
+        """
+        @overrides TelecortexBaseSession.send_cmd_obj
+        """
+        full_cmd = cmd_obj.fmt(checksum=self.do_crc)
+        cmd_obj.bytes_occupied = asyncio.create_task(
+            self.write_line_async(full_cmd))
+        self.last_cmd = cmd_obj
 
-    def wait_for_workers_idle(self):
-        while not self.all_idle:
-            logging.debug("waiting on queue idle")
-            self.relinquish()
+    def set_linenum(self, linenum):
+        """
+        @overrides TelecortexBaseSession.set_linenum
+        """
+        self.send_cmd_with_linenum(
+            "M110",
+            {"N": linenum}
+        )
+        self.linecount = linenum + 1
 
-    def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
-        loops = 0
+    def reset_board(self):
+        """
+        @overrides TelecortexBaseSession.reset_board
+        """
+        self.send_cmd_without_linenum("M9999")
+        self.set_linenum(0)
 
-        while True:
-            loops += 1
-            if loops > 1000:
-                raise UserWarning(
-                    "too many retries: %s, %s" % (
-                        loops, map(str, [server_id, cmd, args, payload])
-                    )
-                )
-            try:
-                self.threads[server_id][0].put(
-                    (cmd, args, payload),
-                    timeout=0
-                )
-            except queue.Full as exc:
-                logging.debug("Queue Full: %d | %s" % (server_id, exc))
-                # TODO: relinquish control to other threads
-                self.relinquish()
-            except OSError as exc:
-                logging.error("OSError: %s" % exc)
-                self.refresh_connections([server_id])
-                continue
-            except Exception as exc:
-                raise UserWarning("unhandled exception: %s" % str(exc))
-            break
+    async def get_cid_async(self):
+        """
+        Async here because has to wait for response from controller
+        """
+        linenum = self.linecount
+        self.send_cmd_with_linenum("P2205")
+        while linenum not in self.responses:
+            logging.debug(
+                '%d not in responses: %s' % (linenum, self.responses,))
+            await asyncio.sleep(0.1)
+        response = self.responses.get(linenum)
 
+        assert \
+            response.startswith('S'), \
+            "Expected P2205 response to have S value, instead N%d: %s" % (
+                linenum, response)
+        self.cid = response[1:]
 
-class TeleCortexVirtualThreadManager(
-    TelecortexThreadManager, TelecortexVirtualManagerMixin
-):
-    serial_class = TelecortexVirtualManagerMixin.serial_class
-    session_class = TelecortexVirtualManagerMixin.session_class
-    get_serial_conf = TelecortexVirtualManagerMixin.get_serial_conf
+        logging.debug("set CID to %s" % self.cid)
 
-
-class TeleCortexCacheManager(TeleCortexBaseManager):
-    def __init__(self, servers, cache_file):
-        super(TeleCortexCacheManager, self).__init__(servers)
-        self.cache_file = cache_file
-        with open(self.cache_file, 'w') as cache:
-            cache.write('')
-
-    def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
-        with open(self.cache_file, 'a') as cache:
-            pass
-            # TODO: fix this
-            # print(
-            #     "%s: %s" % (
-            #         server_id,
-            #         ", ".join(map(str, [
-            #             cmd, json.dumps(args), payload
-            #         ]))
-            #     ), file=cache
-            # )
-
-    def any_alive(self):
-        return True
-
-    def all_idle(self):
-        return True
-
-    def session_active(self, server_id):
-        return True
-
-
-"""
-Servers is a list of objects containing information about a server's
-configuration.
-"""
-
-SERVERS_DOME = OrderedDict([
-    (0, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4057530',
-         'baud': DEFAULT_BAUD, 'cid': 1}),
-    (1, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4058600',
-         'baud': DEFAULT_BAUD, 'cid': 2}),
-    (2, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '3176950',
-         'baud': DEFAULT_BAUD, 'cid': 3}),
-    (3, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4057540',
-         'baud': DEFAULT_BAUD, 'cid': 4}),
-    (4, {'vid': TEENSY_VID, 'pid': 0x0483, 'ser': '4058621',
-         'baud': DEFAULT_BAUD, 'cid': 5})
-])
-
-# SERVERS = OrderedDict([
-#    (0, {'vid': TEENSY_VID, 'pid': 0x0483})
-# ])
-
-# SERVERS_DOME = OrderedDict([
-#     (0, {
-#         'file': '/dev/cu.usbmodem4057531',
-#         'baud': DEFAULT_BAUD,
-#         'timeout': DEFAULT_TIMEOUT
-#     }),
-#     (1, {
-#         'file': '/dev/cu.usbmodem4058621',
-#         'baud': DEFAULT_BAUD,
-#         'timeout': DEFAULT_TIMEOUT
-#     }),
-#     (2, {
-#         'file': '/dev/cu.usbmodem3176951',
-#         'baud': DEFAULT_BAUD,
-#         'timeout': DEFAULT_TIMEOUT
-#     }),
-#     (3, {
-#         'file': '/dev/cu.usbmodem4057541',
-#         'baud': DEFAULT_BAUD,
-#         'timeout': DEFAULT_TIMEOUT
-#     }),
-#     (4, {
-#         'file': '/dev/cu.usbmodem4058601',
-#         'baud': DEFAULT_BAUD,
-#         'timeout': DEFAULT_TIMEOUT
-#     }),
-# ])
-
-SERVERS_SINGLE = OrderedDict([
-    # (0, {
-    #     'vid': TEENSY_VID,
-    #     'pid': 0x0483,
-    #     'baud': DEFAULT_BAUD,
-    #     'timeout': DEFAULT_TIMEOUT
-    # })
-    (0, {
-        'file': '/dev/tty.usbmodem3176940',
-        'baud': DEFAULT_BAUD,
-        'timeout': DEFAULT_TIMEOUT
-    }),
-])
-
-SERVERS_BLANK = OrderedDict([
-
-])
+    def get_cid(self):
+        """
+        @overrides TelecortexBaseSession.get_cid
+        """
+        asyncio.create_task(self.get_cid_async())
 
 
 if __name__ == '__main__':
