@@ -338,6 +338,7 @@ class TeleCortexCacheManager(TeleCortexBaseManager):
             #     ), file=cache
             # )
 
+    @property
     def any_alive(self):
         return True
 
@@ -363,10 +364,8 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
         self.cmd_queues = OrderedDict()
         # asyncio coroutines controlling each serial device
         self.sesh_coroutines = OrderedDict()
-        # asyncio coroutines sending graphics to each serial coroutine
-        self.gfx_coroutines = OrderedDict()
-        # A tuple of (queue, sesh, gfx) for each server_id
-        self.workers = OrderedDict()
+        # asyncio coroutine sending graphics to each serial coroutine
+        self.gfx_coroutine = None
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(True)
         self.refresh_connections()
@@ -407,11 +406,33 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
             )
             self.sesh_coroutines[server_id] = coro
 
-            if server_id not in self.gfx_coroutines:
-                self.gfx_coroutines[server_id] = self.graphics(
-                    self.conf, server_id, self.cmd_queues[server_id])
+        if self.gfx_coroutine is None:
+            self.gfx_coroutine = self.graphics(self, self.conf)
 
-        self.loop.run_until_complete(asyncio.gather(*itertools.chain(
-            self.sesh_coroutines.values(),
-            self.gfx_coroutines.values()
-        )))
+        self.loop.run_until_complete(asyncio.gather(
+            self.gfx_coroutine,
+            *self.sesh_coroutines.values()
+        ))
+
+    @property
+    def all_idle(self):
+        return all([queue.empty() for queue in self.cmd_queues.values()])
+
+    @property
+    def any_alive(self):
+        return True
+
+    async def relinquish_async(self):
+        await asyncio.sleep(0.005)
+
+    async def wait_for_workers_idle_async(self):
+        while not self.all_idle:
+            logging.debug("waiting on queue idle")
+            await self.relinquish_async()
+
+    async def chunk_payload_with_linenum_async(
+        self, server_id, cmd, args, payload
+    ):
+        await self.cmd_queues[server_id].put(
+            (cmd, args, payload)
+        )

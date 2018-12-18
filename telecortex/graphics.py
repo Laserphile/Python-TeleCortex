@@ -17,7 +17,7 @@ ANIM_SPEED = 5
 start_time = time_now()
 
 def get_frameno():
-    return (
+    return int(
         (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
     ) % MAX_ANGLE
 
