@@ -30,6 +30,8 @@ def graphics(manager, conf):
             pixel_list = direct_rainbows(pix_map_normlized, frameno)
             pixel_strs[size] = pix_array2text(*pixel_list)
 
+        manager.wait_for_workers_idle()
+
         for server_id, server_panel_info in conf.panels.items():
             if not manager.threads.get(server_id):
                 logging.debug(
@@ -67,8 +69,6 @@ def graphics(manager, conf):
                         server_id,
                         "M2600", {"Q": panel_number}, pixel_str
                     )
-
-        manager.wait_for_workers_idle()
 
         for server_id in manager.threads.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)

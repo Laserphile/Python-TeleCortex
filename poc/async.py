@@ -46,6 +46,8 @@ async def graphics(manager, conf):
                 pixel_list = direct_rainbows(pix_map_normlized, frameno)
                 pixel_strs[size] = pix_array2text(*pixel_list)
 
+        await manager.wait_for_workers_idle_async()
+
         for server_id, server_panel_info in conf.panels.items():
             if server_id not in manager.sesh_coroutines:
                 logging.debug(
@@ -95,8 +97,6 @@ async def graphics(manager, conf):
             await manager.chunk_payload_with_linenum_async(
                 server_id, "M2610", None, None
             )
-
-        await manager.wait_for_workers_idle_async()
 
 
 def main():
