@@ -3,7 +3,6 @@
 
 import logging
 import os
-import tkinter as tk
 from datetime import datetime
 from pprint import pformat, pprint
 from time import time as time_now
@@ -15,12 +14,12 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
-from PIL import Image, ImageColor, ImageTk
-from PIL.ImageDraw import ImageDraw
 from telecortex.config import TeleCortexSessionConfig
-from telecortex.graphics import fill_rainbows, get_square_canvas, get_frameno
+from telecortex.graphics import (MAIN_WINDOW, cv2_draw_map,
+                                 cv2_setup_main_window, cv2_show_preview,
+                                 fill_rainbows, get_frameno, get_square_canvas)
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import MAPS_DOME, MAPS_GOGGLE, draw_map
+from telecortex.mapping import MAPS_DOME, MAPS_GOGGLE
 from telecortex.session import (DEFAULT_BAUD, TEENSY_VID, TelecortexSession,
                                 find_serial_dev)
 from telecortex.util import pix_array2text
@@ -44,6 +43,7 @@ def main():
     """
 
     telecortex.graphics.IMG_SIZE = 64
+    telecortex.graphics.DOT_RADIUS = 1
 
     conf = TeleCortexSessionConfig(
         name="interpolate_opencv",
@@ -69,20 +69,13 @@ def main():
         logging.debug("target_device: %s" % target_device)
         logging.debug("baud: %s" % conf.args.serial_baud)
 
-    # test_img = cv2.imread(
+    # img = cv2.imread(
     #     '/Users/derwent/Documents/GitHub/touch_dome/Images/test_image.jpg',
     #     cv2.IMREAD_COLOR)
-    test_img = get_square_canvas()
+    img = get_square_canvas()
 
     if conf.args.enable_preview:
-        window_flags = 0
-        window_flags |= cv2.WINDOW_NORMAL
-        # window_flags |= cv2.WINDOW_AUTOSIZE
-        # window_flags |= cv2.WINDOW_FREERATIO
-        window_flags |= cv2.WINDOW_KEEPRATIO
-
-        cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.imshow(MAIN_WINDOW, test_img)
+        cv2_setup_main_window(img)
 
     with serial.Serial(
         port=target_device, baudrate=DEFAULT_BAUD, timeout=1
@@ -91,19 +84,19 @@ def main():
 
         while sesh:
             frameno = get_frameno()
-            fill_rainbows(test_img, frameno)
+            fill_rainbows(img, frameno)
 
             if conf.args.config == 'goggles':
                 pixel_list_goggle = interpolate_pixel_map(
-                    test_img, MAPS_GOGGLE['goggle'], INTERPOLATION_TYPE
+                    img, MAPS_GOGGLE['goggle'], INTERPOLATION_TYPE
                 )
                 pixel_str_goggle = pix_array2text(*pixel_list_goggle)
             else:
                 pixel_list_smol = interpolate_pixel_map(
-                    test_img, MAPS_DOME['smol'], INTERPOLATION_TYPE
+                    img, MAPS_DOME['smol'], INTERPOLATION_TYPE
                 )
                 pixel_list_big = interpolate_pixel_map(
-                    test_img, MAPS_DOME['big'], INTERPOLATION_TYPE
+                    img, MAPS_DOME['big'], INTERPOLATION_TYPE
                 )
 
                 pixel_str_smol = pix_array2text(*pixel_list_smol)
@@ -115,17 +108,12 @@ def main():
                     pixel_str = pixel_str_smol
                 elif map_name.startswith('goggle'):
                     pixel_str = pixel_str_goggle
-                sesh.chunk_payload_with_linenum("M2600", {"Q": panel}, pixel_str)
+                sesh.chunk_payload_with_linenum(
+                    "M2600", {"Q": panel}, pixel_str)
             sesh.send_cmd_with_linenum("M2610")
 
             if conf.args.enable_preview:
-                draw_map(test_img, MAPS_DOME['smol'])
-                draw_map(test_img, MAPS_DOME['big'], outline=(255, 255, 255))
-                cv2.imshow(MAIN_WINDOW, test_img)
-            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-                key = cv2.waitKey(2) & 0xFF
-                if key == 27:
-                    cv2.destroyAllWindows()
+                if cv2_show_preview(img, MAPS_DOME):
                     break
 
 

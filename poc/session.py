@@ -14,16 +14,17 @@ from time import time as time_now
 import coloredlogs
 import cv2
 import numpy as np
-
 from context import telecortex
 from telecortex.config import TeleCortexManagerConfig
-from telecortex.graphics import fill_rainbows, get_square_canvas, get_frameno
+from telecortex.graphics import (cv2_draw_map, cv2_setup_main_window,
+                                 cv2_show_preview, fill_rainbows, get_frameno,
+                                 get_square_canvas)
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
+from telecortex.manage import TelecortexSessionManager
+from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
                                 normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
-from telecortex.manage import TelecortexSessionManager
 from telecortex.util import pix_array2text
 
 MAIN_WINDOW = 'image_window'
@@ -33,6 +34,7 @@ DOT_RADIUS = 0
 
 def main():
     telecortex.graphics.IMG_SIZE = 100
+    telecortex.graphics.DOT_RADIUS = 1
 
     conf = TeleCortexManagerConfig(
         name="session",
@@ -48,23 +50,15 @@ def main():
 
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
+    pixel_map_cache = OrderedDict()
+
+    pixel_map_cache['smol'] = normalize_pix_map(PIXEL_MAP_SMOL)
+    pixel_map_cache['big'] = normalize_pix_map(PIXEL_MAP_BIG)
 
     img = get_square_canvas()
 
     if conf.args.enable_preview:
-        window_flags = 0
-        window_flags |= cv2.WINDOW_NORMAL
-        # window_flags |= cv2.WINDOW_AUTOSIZE
-        # window_flags |= cv2.WINDOW_FREERATIO
-        window_flags |= cv2.WINDOW_KEEPRATIO
-
-        cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.imshow(MAIN_WINDOW, img)
-
-        cv2.moveWindow(MAIN_WINDOW, 500, 0)
-        key = cv2.waitKey(2) & 0xFF
+        cv2_setup_main_window(img)
 
     manager = conf.setup_manager()
 
@@ -73,10 +67,10 @@ def main():
         fill_rainbows(img, frameno)
 
         pixel_list_smol = interpolate_pixel_map(
-            img, pix_map_normlized_smol, INTERPOLATION_TYPE
+            img, pixel_map_cache['smol'], INTERPOLATION_TYPE
         )
         pixel_list_big = interpolate_pixel_map(
-            img, pix_map_normlized_big, INTERPOLATION_TYPE
+            img, pixel_map_cache['big'], INTERPOLATION_TYPE
         )
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
@@ -95,14 +89,8 @@ def main():
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
         if conf.args.enable_preview:
-            draw_map(img, pix_map_normlized_smol)
-            draw_map(img, pix_map_normlized_big, outline=(255, 255, 255))
-            cv2.imshow(MAIN_WINDOW, img)
-            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-                key = cv2.waitKey(2) & 0xFF
-                if key == 27:
-                    cv2.destroyAllWindows()
-                    break
+            if cv2_show_preview(img, pixel_map_cache):
+                break
 
 
 if __name__ == '__main__':

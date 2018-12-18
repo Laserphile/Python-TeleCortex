@@ -515,16 +515,3 @@ MAPS_DOME_TRIFORCE, PANELS_DOME_TRIFORCE = generate_panel_maps(GENERATOR_DOME_TR
 MAPS_TRIFORCE, PANELS_TRIFORCE = generate_panel_maps(GENERATOR_TRIFORCE)
 
 PANELS_PER_CONTROLLER = 4
-
-def draw_map(image, pix_map_normlized, radius=1, outline=None):
-    """Given an image and a normalized pixel map, draw the map on the image."""
-    if outline is None:
-        outline = (0, 0, 0)
-    for pixel in pix_map_normlized:
-        pix_coordinate = denormalize_coordinate(image.shape, pixel)
-        pix_coordinate = (
-            int(pix_coordinate[0]),
-            int(pix_coordinate[1])
-        )
-        cv2.circle(image, pix_coordinate, radius, outline, 1)
-    return image

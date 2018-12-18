@@ -15,10 +15,11 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
-from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
+from telecortex.graphics import (MAX_ANGLE, cv2_draw_map, fill_rainbows,
+                                 get_square_canvas)
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PANELS, PIXEL_MAP_BIG, PIXEL_MAP_SMOL,
-                                draw_map, normalize_pix_map, rotate_mapping,
+                                normalize_pix_map, rotate_mapping,
                                 rotate_vector, scale_mapping,
                                 transpose_mapping)
 from telecortex.session import SERVERS, TelecortexSessionManager
@@ -31,21 +32,7 @@ STREAM_LOG_LEVEL = logging.WARN
 
 LOG_FILE = ".touch_dome.log"
 ENABLE_LOG_FILE = False
-ENABLE_PREVIEW = True
 
-LOGGER = logging.getLogger()
-LOGGER.setLevel(logging.DEBUG)
-FILE_HANDLER = logging.FileHandler(LOG_FILE)
-FILE_HANDLER.setLevel(logging.DEBUG)
-STREAM_HANDLER = logging.StreamHandler()
-STREAM_HANDLER.setLevel(STREAM_LOG_LEVEL)
-if os.name != 'nt':
-    STREAM_HANDLER.setFormatter(coloredlogs.ColoredFormatter())
-STREAM_HANDLER.addFilter(coloredlogs.HostNameFilter())
-STREAM_HANDLER.addFilter(coloredlogs.ProgramNameFilter())
-if ENABLE_LOG_FILE:
-    LOGGER.addHandler(FILE_HANDLER)
-LOGGER.addHandler(STREAM_HANDLER)
 
 TARGET_FRAMERATE = 20
 ANIM_SPEED = 5
@@ -60,55 +47,37 @@ def main():
 
     logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
-    manager = TelecortexSessionManager(SERVERS)
+    conf = TeleCortexManagerConfig(
+        name="touch_dome",
+        description=("Display the output from the touch dome on the panels"),
+        default_config='dome_overhead'
+    )
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
 
-    pix_map_normlized_smol = normalize_pix_map(PIXEL_MAP_SMOL)
-    pix_map_normlized_big = normalize_pix_map(PIXEL_MAP_BIG)
+    conf.parse_args()
+
+    manager = conf.setup_manager()
+
+    logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
 
     img = get_square_canvas()
 
-    if ENABLE_PREVIEW:
-        window_flags = 0
-        window_flags |= cv2.WINDOW_NORMAL
-        # window_flags |= cv2.WINDOW_AUTOSIZE
-        # window_flags |= cv2.WINDOW_FREERATIO
-        window_flags |= cv2.WINDOW_KEEPRATIO
+    if conf.args.enable_preview:
+        cv2_setup_main_window(img)
 
-        cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.imshow(MAIN_WINDOW, img)
-        cv2.moveWindow(MAIN_WINDOW, 500, 0)
-        key = cv2.waitKey(2) & 0xFF
-
-    pixel_map_cache = OrderedDict()
-
-    start_time = time_now()
-
-    while any([manager.sessions.get(server_id) for server_id in PANELS]):
-        frameno = (
-            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
-        ) % MAX_ANGLE
+    while manager.any_alive:
+        frameno = get_frameno()
         fill_rainbows(img, frameno)
 
-        for server_id, server_panel_info in PANELS.items():
+        for server_id, server_panel_info in conf.panels.items():
             if not manager.sessions.get(server_id):
                 continue
-            for panel_number, size, scale, angle, offset in server_panel_info:
-                if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if size == 'big':
-                        map = pix_map_normlized_big
-                    elif size == 'smol':
-                        map = pix_map_normlized_smol
-                    map = transpose_mapping(map, (-0.5, -0.5))
-                    map = scale_mapping(map, scale)
-                    map = rotate_mapping(map, angle)
-                    map = transpose_mapping(map, (+0.5, +0.5))
-                    map = transpose_mapping(map, offset)
-                    pixel_map_cache[(server_id, panel_number)] = map
-                else:
-                    map = pixel_map_cache[(server_id, panel_number)]
+            for panel_number, map_name in server_panel_info:
+                panel_map = conf.maps[map_name]
 
                 pixel_list = interpolate_pixel_map(
-                    img, map, INTERPOLATION_TYPE
+                    img, panel_map, INTERPOLATION_TYPE
                 )
                 pixel_str = pix_array2text(*pixel_list)
 
@@ -118,17 +87,9 @@ def main():
             # import pudb; pudb.set_trace()
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
-        if ENABLE_PREVIEW:
-            for map in pixel_map_cache.values():
-                draw_map(img, map, DOT_RADIUS + 1, outline=(255, 255, 255))
-            for map in pixel_map_cache.values():
-                draw_map(img, map, DOT_RADIUS)
-            cv2.imshow(MAIN_WINDOW, img)
-            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-                key = cv2.waitKey(2) & 0xFF
-                if key == 27:
-                    cv2.destroyAllWindows()
-                    break
+        if conf.args.enable_preview:
+            if cv2_show_preview(img, pixel_map_cache):
+                break
 
 
 if __name__ == '__main__':

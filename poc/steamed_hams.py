@@ -11,14 +11,14 @@ from time import time as time_now
 import coloredlogs
 import cv2
 import numpy as np
-from mss import mss
-
 # noinspection PyUnresolvedReferences
 from context import telecortex
+from mss import mss
 from telecortex.config import TeleCortexManagerConfig
+from telecortex.graphics import (cv2_draw_map, cv2_setup_main_window,
+                                 cv2_show_preview)
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.manage import TelecortexSessionManager
-from telecortex.mapping import draw_map
 from telecortex.util import pix_array2text
 
 TARGET_FRAMERATE = 20
@@ -58,16 +58,7 @@ def main():
     img = np.array(sct.grab(MON))
 
     if conf.args.enable_preview:
-        window_flags = 0
-        window_flags |= cv2.WINDOW_NORMAL
-        # window_flags |= cv2.WINDOW_AUTOSIZE
-        # window_flags |= cv2.WINDOW_FREERATIO
-        window_flags |= cv2.WINDOW_KEEPRATIO
-
-        cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.moveWindow(MAIN_WINDOW, 500, 0)
-        cv2.imshow(MAIN_WINDOW, img)
-        key = cv2.waitKey(2) & 0xFF
+        cv2_setup_main_window(img)
 
     manager = conf.setup_manager()
 
@@ -93,20 +84,10 @@ def main():
                 )
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
+
         if conf.args.enable_preview:
-            for map_name, mapping in conf.maps.items():
-                draw_map(img, mapping, DOT_RADIUS+1, outline=(255, 255, 255))
-            for map_name, mapping in conf.maps.items():
-                draw_map(img, mapping, DOT_RADIUS)
-            cv2.imshow(MAIN_WINDOW, img)
-            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-                key = cv2.waitKey(2) & 0xFF
-                if key == 27:
-                    cv2.destroyAllWindows()
-                    break
-                elif key == ord('d'):
-                    import pudb
-                    pudb.set_trace()
+            if cv2_show_preview(img, conf.maps):
+                break
 
 
 if __name__ == '__main__':

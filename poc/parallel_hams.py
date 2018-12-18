@@ -14,53 +14,28 @@ import numpy as np
 from context import telecortex
 from mss import mss
 from telecortex.config import TeleCortexThreadManagerConfig
+from telecortex.graphics import (MAIN_WINDOW, cv2_setup_main_window,
+                                 cv2_show_preview, cv2_draw_map)
 from telecortex.interpolation import interpolate_pixel_map
-from telecortex.mapping import draw_map, transform_panel_map
+from telecortex.mapping import transform_panel_map
 from telecortex.util import pix_array2text
 
-TARGET_FRAMERATE = 20
-MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
-DOT_RADIUS = 3
 
 MON = {'top': 200, 'left': 200, 'width': 400, 'height': 400}
 
-def main():
-    conf = TeleCortexThreadManagerConfig(
-        name="parallel_hams",
-        description=(
-            "take the output of the screen and draw on several telecortex "
-            "controllers in parallel"),
-        default_config='dome_overhead'
-    )
 
-    conf.parser.add_argument('--enable-preview', default=False,
-                             action='store_true')
-
-    conf.parse_args()
-
-    manager = conf.setup_manager()
+def graphics(manager, conf):
 
     sct = mss()
 
     img = np.array(sct.grab(MON))
 
     if conf.args.enable_preview:
-        window_flags = 0
-        window_flags |= cv2.WINDOW_NORMAL
-        # window_flags |= cv2.WINDOW_AUTOSIZE
-        # window_flags |= cv2.WINDOW_FREERATIO
-        window_flags |= cv2.WINDOW_KEEPRATIO
-
-        cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.moveWindow(MAIN_WINDOW, 900, 0)
-        cv2.resizeWindow(MAIN_WINDOW, 700, 700)
-        cv2.imshow(MAIN_WINDOW, img)
+        cv2_setup_main_window(img)
 
     pixel_map_cache = OrderedDict()
-
-    start_time = time_now()
 
     while manager.any_alive:
 
@@ -101,20 +76,27 @@ def main():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
         if conf.args.enable_preview:
-            for panel_map in pixel_map_cache.values():
-                draw_map(
-                    img, panel_map, DOT_RADIUS + 1, outline=(255, 255, 255))
-            for panel_map in pixel_map_cache.values():
-                draw_map(img, panel_map, DOT_RADIUS)
-            cv2.imshow(MAIN_WINDOW, img)
-            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-                key = cv2.waitKey(2) & 0xFF
-                if key == 27:
-                    cv2.destroyAllWindows()
-                    break
-                elif key == ord('d'):
-                    import pudb
-                    pudb.set_trace()
+            if cv2_show_preview(img, pixel_map_cache):
+                break
+
+
+def main():
+    conf = TeleCortexThreadManagerConfig(
+        name="parallel_hams",
+        description=(
+            "take the output of the screen and draw on several telecortex "
+            "controllers in parallel"),
+        default_config='dome_overhead'
+    )
+
+    conf.parser.add_argument('--enable-preview', default=False,
+                             action='store_true')
+
+    conf.parse_args()
+
+    manager = conf.setup_manager()
+
+    graphics(manager, conf)
 
 
 if __name__ == '__main__':

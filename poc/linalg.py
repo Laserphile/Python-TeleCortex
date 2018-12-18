@@ -14,18 +14,15 @@ from time import time as time_now
 import coloredlogs
 import cv2
 import numpy as np
-
 from context import telecortex
 from telecortex.config import TeleCortexManagerConfig
-from telecortex.graphics import fill_rainbows, get_square_canvas, get_frameno
+from telecortex.graphics import (cv2_draw_map, fill_rainbows, get_frameno,
+                                 get_square_canvas)
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.manage import TelecortexSessionManager
 from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
-from telecortex.mapping import draw_map
 from telecortex.util import pix_array2text
 
-
-MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
 DOT_RADIUS = 0
@@ -33,7 +30,8 @@ DOT_RADIUS = 0
 
 def main():
 
-    telecortex.graphics.IMG_SIZE = 256
+    telecortex.graphics.IMG_SIZE = 128
+    telecortex.graphics.DOT_RADIUS = 1
 
     conf = TeleCortexManagerConfig(
         name="linalg",
@@ -51,22 +49,11 @@ def main():
     img = get_square_canvas()
 
     if conf.args.enable_preview:
-        window_flags = 0
-        window_flags |= cv2.WINDOW_NORMAL
-        # window_flags |= cv2.WINDOW_AUTOSIZE
-        # window_flags |= cv2.WINDOW_FREERATIO
-        window_flags |= cv2.WINDOW_KEEPRATIO
-
-        cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
-        cv2.imshow(MAIN_WINDOW, img)
-        cv2.moveWindow(MAIN_WINDOW, 500, 0)
-        key = cv2.waitKey(2) & 0xFF
-
-    start_time = time_now()
+        cv2_setup_main_window(img)
 
     manager = conf.setup_manager()
 
-    while any([manager.sessions.get(server_id) for server_id in conf.panels]):
+    while manager.any_alive:
         frameno = get_frameno()
         fill_rainbows(img, frameno)
 
@@ -88,16 +75,8 @@ def main():
             manager.sessions[server_id].send_cmd_with_linenum('M2610')
 
         if conf.args.enable_preview:
-            for map_name, mapping in conf.maps.items():
-                draw_map(img, mapping, DOT_RADIUS + 1, outline=(255, 255, 255))
-            for map_name, mapping in conf.maps.items():
-                draw_map(img, mapping, DOT_RADIUS)
-            cv2.imshow(MAIN_WINDOW, img)
-            if int(time_now() * TARGET_FRAMERATE / 2) % 2 == 0:
-                key = cv2.waitKey(2) & 0xFF
-                if key == 27:
-                    cv2.destroyAllWindows()
-                    break
+            if cv2_show_preview(img, conf.maps):
+                break
 
 
 if __name__ == '__main__':
