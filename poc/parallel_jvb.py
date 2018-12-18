@@ -76,7 +76,7 @@ def main():
         pixel_str_smol = pix_array2text(*pixel_list_smol)
         pixel_str_big = pix_array2text(*pixel_list_big)
         for server_id, server_panel_info in conf.panels.items():
-            if not manager.threads.get(server_id):
+            if not manager.sessions.get(server_id):
                 continue
             for panel_number, map_name in server_panel_info:
                 size = map_name.split('-')[0]
@@ -94,7 +94,7 @@ def main():
 
         manager.wait_for_workers_idle()
 
-        for server_id in manager.threads.keys():
+        for server_id in manager.sessions.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
 

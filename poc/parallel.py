@@ -33,10 +33,10 @@ def graphics(manager, conf):
         manager.wait_for_workers_idle()
 
         for server_id, server_panel_info in conf.panels.items():
-            if not manager.threads.get(server_id):
+            if not manager.sessions.get(server_id):
                 logging.debug(
-                    "server id %s not found in manager threads: %s" % (
-                        server_id, manager.threads.keys(),
+                    "server id %s not found in manager sessions: %s" % (
+                        server_id, manager.sessions.keys(),
                     )
                 )
                 continue
@@ -70,7 +70,7 @@ def graphics(manager, conf):
                         "M2600", {"Q": panel_number}, pixel_str
                     )
 
-        for server_id in manager.threads.keys():
+        for server_id in manager.sessions.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
 def main():

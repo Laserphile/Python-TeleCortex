@@ -1,6 +1,7 @@
 """
 Manage multiple session.TelecortexSession objects in different ways.
 
+TODO: Managers have access to conf object.
 """
 
 
@@ -110,6 +111,11 @@ class TeleCortexBaseManager(object):
 
         return response
 
+
+    @property
+    def any_alive(self):
+        raise NotImplementedError()
+
     def all_idle(self):
         raise NotImplementedError()
 
@@ -161,6 +167,18 @@ class TelecortexSessionManager(TeleCortexBaseManager):
             session.close()
         self.sessions = OrderedDict()
 
+    def chunk_payload_with_linenum(self, server_id, cmd, args, payload):
+        self.sessions[server_id].chunk_payload_with_linenum(cmd, args, payload)
+
+    @property
+    def any_alive(self):
+        # TODO: implement this
+        return True
+
+    def wait_for_workers_idle(self):
+        # TODO: implement this
+        pass
+
     def __enter__(self, *args, **kwargs):
         # TODO: this
         pass
@@ -194,7 +212,7 @@ class TelecortexVirtualManager(
 
 class TelecortexThreadManager(TeleCortexBaseManager):
     """
-    Manage TelecortexSession objects in multiple threads.
+    Manage TelecortexSession objects in multiple sessions.
     """
     session_class = ThreadedTelecortexSession
 
@@ -203,7 +221,8 @@ class TelecortexThreadManager(TeleCortexBaseManager):
     def __init__(self, servers, **kwargs):
         super(TelecortexThreadManager, self).__init__(servers, **kwargs)
         # A tuple of (queue, proc) for each server_id
-        self.threads = OrderedDict()
+        # TODO: split into sesh_workers and cmd_queues
+        self.sessions = OrderedDict()
         self.refresh_connections()
 
     @classmethod
@@ -223,7 +242,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
                 cmd, args, payload = queue_.get_nowait()
             except queue.Empty as exc:
                 logging.info("Queue Empty: %s | %s" % (sesh.cid, exc))
-                # TODO: relinquish control to other threads
+                # TODO: relinquish control to other sessions
                 cls.relinquish()
                 continue
             except Exception as exc:
@@ -245,7 +264,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
         ctx = mp.get_context('fork')
 
         for server_id in server_ids:
-            queue, old_proc = self.threads.get(server_id, (None, None))
+            queue, old_proc = self.sessions.get(server_id, (None, None))
             if old_proc is not None:
                 old_proc.terminate()
 
@@ -262,19 +281,19 @@ class TelecortexThreadManager(TeleCortexBaseManager):
                     name="controller_%s" % server_id
                 )
                 proc.start()
-                self.threads[server_id] = (queue, proc)
+                self.sessions[server_id] = (queue, proc)
 
     @property
     def any_alive(self):
-        return any([self.threads.get(server_id, (None, None))[1]
+        return any([self.sessions.get(server_id, (None, None))[1]
                     for server_id in self.servers.keys()])
 
     def session_active(self, server_id):
-        return self.threads.get(server_id)
+        return self.sessions.get(server_id)
 
     @property
     def all_idle(self):
-        return all([queue.empty() for (queue, proc) in self.threads.values()])
+        return all([queue.empty() for (queue, proc) in self.sessions.values()])
 
     def wait_for_workers_idle(self):
         while not self.all_idle:
@@ -293,13 +312,13 @@ class TelecortexThreadManager(TeleCortexBaseManager):
                     )
                 )
             try:
-                self.threads[server_id][0].put(
+                self.sessions[server_id][0].put(
                     (cmd, args, payload),
                     timeout=0
                 )
             except queue.Full as exc:
                 logging.debug("Queue Full: %d | %s" % (server_id, exc))
-                # TODO: relinquish control to other threads
+                # TODO: relinquish control to other sessions
                 self.relinquish()
             except OSError as exc:
                 logging.error("OSError: %s" % exc)
@@ -364,6 +383,8 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
         self.cmd_queues = OrderedDict()
         # asyncio coroutines controlling each serial device
         self.sesh_coroutines = OrderedDict()
+        # TODO: rename sesh_workers
+        self.sessions = OrderedDict()
         # asyncio coroutine sending graphics to each serial coroutine
         self.gfx_coroutine = None
         self.loop = asyncio.get_event_loop()
@@ -390,8 +411,8 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
             if server_id not in self.cmd_queues:
                 self.cmd_queues[server_id] = asyncio.Queue(self.queue_len)
 
-            if server_id in self.sesh_coroutines:
-                self.sesh_coroutines[server_id].cancel()
+            if server_id in self.sessions:
+                self.sessions[server_id].cancel()
             serial_kwargs = self.get_serial_conf(server_info)
             serial_url = serial_kwargs.pop('port')
             coro = serial_asyncio.create_serial_connection(
@@ -404,14 +425,14 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
                 serial_url,
                 **serial_kwargs
             )
-            self.sesh_coroutines[server_id] = coro
+            self.sessions[server_id] = coro
 
         if self.gfx_coroutine is None:
             self.gfx_coroutine = self.graphics(self, self.conf)
 
         self.loop.run_until_complete(asyncio.gather(
             self.gfx_coroutine,
-            *self.sesh_coroutines.values()
+            *self.sessions.values()
         ))
 
     @property
@@ -420,6 +441,7 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
 
     @property
     def any_alive(self):
+        # TODO: implement this
         return True
 
     async def relinquish_async(self):

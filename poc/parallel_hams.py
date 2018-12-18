@@ -44,7 +44,7 @@ def graphics(manager, conf):
         cv2.imshow(MAIN_WINDOW, np.array(img))
 
         for server_id, server_panel_info in conf.panels.items():
-            if not manager.threads.get(server_id):
+            if not manager.sessions.get(server_id):
                 continue
             for panel_number, map_name in server_panel_info:
                 if (server_id, panel_number) not in pixel_map_cache.keys():
@@ -72,7 +72,7 @@ def graphics(manager, conf):
 
         manager.wait_for_workers_idle()
 
-        for server_id in manager.threads.keys():
+        for server_id in manager.sessions.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
         if conf.args.enable_preview:

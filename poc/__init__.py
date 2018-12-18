@@ -8,7 +8,7 @@
 - linalg.py : Multiple controller, uses multiple mappings to draw different parts of the same rainbow on a panel on each controller
 - steamed_hams.py : Multiple controller, uses multiple mappings to draw different parts of a screendump on a panel on each controller
 
-- parallel_X.py : X but communication is implemented in multiple parallel threads.
+- parallel_X.py : X but communication is implemented in multiple parallel sessions.
 - parallel_jvb.py : The script we were running at Blazing Swan 2018
 
 ## Helpers:

@@ -14,6 +14,7 @@ import coloredlogs
 import cv2
 import numpy as np
 from context import telecortex
+from linalg import graphics
 from mss import mss
 from telecortex.config import TeleCortexThreadManagerConfig
 from telecortex.graphics import (MAIN_WINDOW, cv2_draw_map,
@@ -44,72 +45,11 @@ def main():
 
     conf.parse_args()
 
+    logging.debug("\n\n\nnew session at %s" % datetime.now().isoformat())
+
     manager = conf.setup_manager()
 
-    img = get_square_canvas()
-
-    if conf.args.enable_preview:
-        cv2_setup_main_window(img)
-
-    pixel_map_cache = OrderedDict()
-
-    while manager.any_alive:
-        frameno = get_frameno()
-        fill_rainbows(img, frameno)
-
-        for server_id, server_panel_info in conf.panels.items():
-            if not manager.threads.get(server_id):
-                continue
-            for panel_number, map_name in server_panel_info:
-                if (server_id, panel_number) not in pixel_map_cache.keys():
-                    if map_name not in conf.maps:
-                        raise UserWarning(
-                            'Panel map_name %s not in known mappings: %s' % (
-                                map_name, conf.maps.keys()
-                            )
-                        )
-                    panel_map = conf.maps[map_name]
-
-                    pixel_map_cache[(server_id, panel_number)] = panel_map
-
-                if INTERLEAVE:
-                    continue
-                panel_map = pixel_map_cache.get((server_id, panel_number))
-
-                pixel_list = interpolate_pixel_map(
-                    img, panel_map, INTERPOLATION_TYPE
-                )
-                pixel_str = pix_array2text(*pixel_list)
-                manager.chunk_payload_with_linenum(
-                    server_id,
-                    "M2600", {"Q": panel_number}, pixel_str
-                )
-
-        if INTERLEAVE:
-            for panel_number in range(PANELS_PER_CONTROLLER):
-                for server_id in conf.panels.keys():
-                    panel_map = pixel_map_cache.get((server_id, panel_number))
-                    if not panel_map:
-                        continue
-
-                    pixel_list = interpolate_pixel_map(
-                        img, panel_map, INTERPOLATION_TYPE
-                    )
-                    pixel_str = pix_array2text(*pixel_list)
-
-                    manager.chunk_payload_with_linenum(
-                        server_id,
-                        "M2600", {"Q": panel_number}, pixel_str
-                    )
-
-        manager.wait_for_workers_idle()
-
-        for server_id in manager.threads.keys():
-            manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
-
-        if conf.args.enable_preview:
-            if cv2_show_preview(img, pixel_map_cache):
-                break
+    graphics(manager, conf)
 
 
 if __name__ == '__main__':

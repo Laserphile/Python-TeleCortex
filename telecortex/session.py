@@ -468,7 +468,7 @@ class TelecortexSession(TelecortexBaseSession):
 
     def relinquish(self):
         """
-        Potentially relinquish control to other threads.
+        Potentially relinquish control to other sessions.
         """
         pass
 
@@ -679,7 +679,7 @@ class VirtualTelecortexSession(TelecortexSession):
 class ThreadedTelecortexSession(TelecortexSession):
     def relinquish(self):
         """
-        Relinquish control to other threads.
+        Relinquish control to other sessions.
         """
         # TODO: actually relinquish
         time.sleep(0.01)

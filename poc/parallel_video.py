@@ -106,7 +106,7 @@ def main():
 
         manager.wait_for_workers_idle()
 
-        for server_id in manager.threads.keys():
+        for server_id in manager.sessions.keys():
             manager.chunk_payload_with_linenum(server_id, "M2610", None, None)
 
         if conf.args.enable_preview:

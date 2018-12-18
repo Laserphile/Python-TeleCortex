@@ -30,8 +30,6 @@ assert sys.version_info > (3, 7), (
 
 
 async def graphics(manager, conf):
-    # TODO: Rewrite this to take manager instead of server id
-
     # Frame number used for animations
     frameno = 0
     pixel_strs = {}
@@ -49,10 +47,10 @@ async def graphics(manager, conf):
         await manager.wait_for_workers_idle_async()
 
         for server_id, server_panel_info in conf.panels.items():
-            if server_id not in manager.sesh_coroutines:
+            if server_id not in manager.sessions:
                 logging.debug(
                     "server id %s not found in manager coroutines: %s" % (
-                        server_id, manager.sesh_coroutines.keys(),
+                        server_id, manager.sessions.keys(),
                     )
                 )
                 continue
