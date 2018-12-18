@@ -10,6 +10,7 @@ import queue
 import re
 import sys
 import time
+import numpy
 from builtins import super
 from collections import OrderedDict, deque
 from copy import deepcopy
@@ -469,7 +470,7 @@ class TelecortexSession(TelecortexBaseSession):
         """
         Potentially relinquish control to other threads.
         """
-        time.sleep(0.01)
+        pass
 
     @classmethod
     def from_serial_conf(cls, serial_conf, linenum=0):
@@ -557,20 +558,38 @@ class TelecortexSession(TelecortexBaseSession):
         # byte_array = serial.to_bytes(text)
         if not text[-1] == '\n':
             text = text + '\n'
-        assert isinstance(text, six.text_type), "text should be text_type"
-        if six.PY3:
-            byte_array = six.binary_type(text, 'latin-1')
-        if six.PY2:
-            byte_array = six.binary_type(text)
-        while len(byte_array) > (self.ser_buf_size - self.ser.out_waiting):
-            logging.debug("waiting on write out: %d > (%d - %d)" % (
-                len(byte_array),
-                self.chunk_size,
-                self.ser.out_waiting
-            ))
-            self.relinquish()
-        self.ser.write(byte_array)
-        return len(byte_array)
+        # assert isinstance(text, six.text_type), "text should be text_type"
+        # if six.PY3:
+        #     byte_array = six.binary_type(text, 'latin-1')
+        # if six.PY2:
+        #     byte_array = six.binary_type(text)
+
+        bytes_ = converters.to_bytes(text)
+        bytes_len = len(bytes_)
+
+        while bytes_:
+            buf_left = self.ser_buf_size - self.ser.out_waiting
+            buf_left = numpy.clip(buf_left, 0, len(bytes_))
+            logging.debug("writing partial: %s" % (repr(bytes_[:buf_left]),))
+            self.ser.write(bytes_[:buf_left])
+            bytes_ = bytes_[buf_left:]
+            if bytes_:
+                logging.debug("waiting on write out: %d = %d - %d" % (
+                    buf_left,
+                    self.ser_buf_size,
+                    self.ser.out_waiting
+                ))
+                self.relinquish()
+
+        # while len(bytes_) > (self.ser_buf_size - self.ser.out_waiting):
+        #     logging.debug("waiting on write out: %d > (%d - %d)" % (
+        #         len(bytes_),
+        #         self.chunk_size,
+        #         self.ser.out_waiting
+        #     ))
+        #     self.relinquish()
+        # self.ser.write(bytes_)
+        return bytes_len
 
     def get_line(self):
         """
@@ -683,6 +702,8 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         TelecortexBaseSession.__init__(self, *args, **kwargs)
         # Asyncio queue containing commands to be run
         self.cmd_queue = queue_
+        # Since serial writes are parallelized, must have a mutex.
+        self.serial_lock = asyncio.Lock()
 
     def connection_made(self, transport):
         """
@@ -750,6 +771,9 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
     #     logging.debug(self.transport.get_write_buffer_size())
     #     logging.debug('resume writing')
 
+    async def relinquish_async(self):
+        await asyncio.sleep(0.005)
+
     async def write_line_async(self, text):
         """
         Async here because Serial.write blocks?
@@ -760,8 +784,24 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         # bytes_ = six.binary_type(text, 'latin-1')
         # bytes_ = text.encode('utf8')
         bytes_ = converters.to_bytes(text)
-        self.transport.serial.write(bytes_)
-        return len(bytes_)
+        bytes_len = len(bytes_)
+
+        async with self.serial_lock:
+            while bytes_:
+                buf_left = self.ser_buf_size - self.transport.serial.out_waiting
+                buf_left = numpy.clip(buf_left, 0, len(bytes_))
+                logging.debug("writing partial: %s" % (repr(bytes_[:buf_left]),))
+                self.transport.serial.write(bytes_[:buf_left])
+                bytes_ = bytes_[buf_left:]
+
+                if bytes_:
+                    logging.debug("waiting on write out: %d = %d - %d" % (
+                        buf_left,
+                        self.ser_buf_size,
+                        self.transport.serial.out_waiting
+                    ))
+                    # await self.relinquish_async()
+        return bytes_len
 
     # def write_line(self, text):
     #     """
@@ -803,7 +843,7 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         while linenum not in self.responses:
             logging.debug(
                 '%d not in responses: %s' % (linenum, self.responses,))
-            await asyncio.sleep(0.1)
+            await self.relinquish_async()
         response = self.responses.get(linenum)
 
         assert \
