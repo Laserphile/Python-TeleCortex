@@ -44,7 +44,6 @@ class TeleCortexConfig(object):
         self.parser.add_argument('--chunk-size', default=230, type=int)
         self.parser.add_argument('--ser-buf-size', default=(230 * 1.2),
                                  type=int)
-
         # self.parser.add_argument('--disable-log-file', action='store_false',
         #                          dest='enable_log_file')
         self.parser.add_argument(
@@ -146,7 +145,8 @@ class TeleCortexConfig(object):
             'do_crc': self.args.do_crc,
             'ignore_acks': self.args.ignore_acks,
             'chunk_size': self.args.chunk_size,
-            'ser_buf_size': self.args.ser_buf_size
+            'ser_buf_size': self.args.ser_buf_size,
+            'manager_relinquish': self.args.manager_relinquish
         }
 
 
@@ -176,6 +176,8 @@ class TeleCortexManagerConfig(TeleCortexConfig):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.parser.add_argument('--manager-relinquish', default=0.001,
+                                 type=float)
 
     @property
     def manager_class(self):

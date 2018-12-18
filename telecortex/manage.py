@@ -36,6 +36,7 @@ class TeleCortexBaseManager(object):
     def __init__(self, servers, **kwargs):
         self.servers = servers
         self.known_cids = OrderedDict()
+        self.__class__.relinquish_time = kwargs.pop('manager_relinquish', 0.001)
         self.session_kwargs = kwargs
 
     @classmethod
@@ -227,7 +228,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
     @classmethod
     def relinquish(cls):
-        time.sleep(0.005)
+        time.sleep(cls.relinquish_time)
 
     @classmethod
     def controller_thread(cls, serial_conf, queue_, session_kwargs):
@@ -444,7 +445,7 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
         return True
 
     async def relinquish_async(self):
-        await asyncio.sleep(0.005)
+        await asyncio.sleep(self.relinquish_time)
 
     async def wait_for_workers_idle_async(self):
         while not self.all_idle:
