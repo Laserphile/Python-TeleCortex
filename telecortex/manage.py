@@ -1,3 +1,9 @@
+"""
+Manage multiple session.TelecortexSession objects in different ways.
+
+"""
+
+
 import logging
 import multiprocessing as mp
 import queue
@@ -21,7 +27,7 @@ from telecortex.session import (TelecortexSerialProtocol, TelecortexSession,
 # TODO: rename TelecortexBaseManager
 class TeleCortexBaseManager(object):
     """
-    Manage multiple TelecortexSession objects.
+    Manage multiple abstract TelecortexSession objects.
     """
     session_class = TelecortexSession
     serial_class = serial.Serial
