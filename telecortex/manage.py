@@ -382,7 +382,6 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
         # asyncio.Queues for sending commands to each server.
         self.cmd_queues = OrderedDict()
         # asyncio coroutines controlling each serial device
-        self.sesh_coroutines = OrderedDict()
         # TODO: rename sesh_workers
         self.sessions = OrderedDict()
         # asyncio coroutine sending graphics to each serial coroutine

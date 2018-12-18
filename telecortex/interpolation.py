@@ -102,14 +102,29 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
 
     This could be optimized by calculating the denormalized coordinates first.
     """
+    pix_coordinates = [
+        denormalize_coordinate(image.shape, pix)
+        for pix in pix_map_normalized
+    ]
+
     pixel_list = []
-    for pix in pix_map_normalized:
-        pix_coordinate = denormalize_coordinate(image.shape, pix)
-        pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
-        if len(pixel_value) > 3:
-            # BGRA fix
-            pixel_value = tuple(pixel_value[:3])
-        pixel_list.append(pixel_value)
+    if interp_type == 'nearest':
+        # Here be bad numpy hacks
+        pix_coordinates = list(map(
+            lambda x: int(round(x[0])) * image.shape[0] + int(round(x[0])),
+            pix_coordinates
+        ))
+        pixel_list = image.reshape(
+            image.shape[0] * image.shape[1],
+            image.shape[2]
+        )[pix_coordinates]
+    else:
+        for pix_coordinate in pix_coordinates:
+            pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
+            if len(pixel_value) > 3:
+                # BGRA fix
+                pixel_value = tuple(pixel_value[:3])
+            pixel_list.append(pixel_value)
     # logging.debug("pixel_list: %s" % pformat(pixel_list))
     pixel_list = list(itertools.chain(*pixel_list))
     assert len(pixel_list) % 4 == 0
