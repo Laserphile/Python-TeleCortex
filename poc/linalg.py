@@ -17,15 +17,14 @@ import numpy as np
 
 from context import telecortex
 from telecortex.config import TeleCortexManagerConfig
-from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
+from telecortex.graphics import fill_rainbows, get_square_canvas, get_frameno
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.manage import TelecortexSessionManager
 from telecortex.mapping import GENERATOR_DOME_OVERHEAD as PANELS
 from telecortex.mapping import draw_map
 from telecortex.util import pix_array2text
 
-TARGET_FRAMERATE = 20
-ANIM_SPEED = 5
+
 MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
@@ -68,9 +67,7 @@ def main():
     manager = conf.setup_manager()
 
     while any([manager.sessions.get(server_id) for server_id in conf.panels]):
-        frameno = (
-            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
-        ) % MAX_ANGLE
+        frameno = get_frameno()
         fill_rainbows(img, frameno)
 
         for server_id, server_panel_info in conf.panels.items():

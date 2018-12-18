@@ -14,9 +14,10 @@ from time import time as time_now
 import coloredlogs
 import cv2
 import numpy as np
+
 from context import telecortex
 from telecortex.config import TeleCortexManagerConfig
-from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
+from telecortex.graphics import fill_rainbows, get_square_canvas, get_frameno
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
                                 normalize_pix_map, rotate_mapping,
@@ -25,8 +26,6 @@ from telecortex.mapping import (PIXEL_MAP_BIG, PIXEL_MAP_SMOL, draw_map,
 from telecortex.manage import TelecortexSessionManager
 from telecortex.util import pix_array2text
 
-TARGET_FRAMERATE = 20
-ANIM_SPEED = 5
 MAIN_WINDOW = 'image_window'
 # INTERPOLATION_TYPE = 'bilinear'
 INTERPOLATION_TYPE = 'nearest'
@@ -67,14 +66,10 @@ def main():
         cv2.moveWindow(MAIN_WINDOW, 500, 0)
         key = cv2.waitKey(2) & 0xFF
 
-    start_time = time_now()
-
     manager = conf.setup_manager()
 
     while manager:
-        frameno = (
-            (time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED
-        ) % MAX_ANGLE
+        frameno = get_frameno()
         fill_rainbows(img, frameno)
 
         pixel_list_smol = interpolate_pixel_map(

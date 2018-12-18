@@ -18,7 +18,7 @@ from context import telecortex
 from PIL import Image, ImageColor, ImageTk
 from PIL.ImageDraw import ImageDraw
 from telecortex.config import TeleCortexSessionConfig
-from telecortex.graphics import MAX_ANGLE, fill_rainbows, get_square_canvas
+from telecortex.graphics import fill_rainbows, get_square_canvas, get_frameno
 from telecortex.interpolation import interpolate_pixel_map
 from telecortex.mapping import MAPS_DOME, MAPS_GOGGLE, draw_map
 from telecortex.session import (DEFAULT_BAUD, TEENSY_VID, TelecortexSession,
@@ -84,14 +84,13 @@ def main():
         cv2.namedWindow(MAIN_WINDOW, flags=window_flags)
         cv2.imshow(MAIN_WINDOW, test_img)
 
-    start_time = time_now()
     with serial.Serial(
         port=target_device, baudrate=DEFAULT_BAUD, timeout=1
     ) as ser:
         sesh = conf.setup_session(ser)
 
         while sesh:
-            frameno = ((time_now() - start_time) * TARGET_FRAMERATE * ANIM_SPEED) % MAX_ANGLE
+            frameno = get_frameno()
             fill_rainbows(test_img, frameno)
 
             if conf.args.config == 'goggles':
