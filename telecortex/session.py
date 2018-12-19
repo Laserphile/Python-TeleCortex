@@ -142,6 +142,8 @@ class TelecortexBaseSession(object):
         self.chunk_size = kwargs.get('chunk_size', 2000)
         # Maximum bytes allowed to sit in Serial.out_waiting
         self.ser_buf_size = kwargs.get('ser_buf_size', 10000)
+        # Amount of time to wait for
+        self.sesh_relinquish = kwargs.get('sesh_relinquish', 0.001)
 
     def get_line(self):
         """
@@ -495,7 +497,8 @@ class TelecortexSession(TelecortexBaseSession):
         full_cmd = cmd_obj.fmt(checksum=self.do_crc)
         while any([
             self.lines_avail,
-            self.bytes_left < len(full_cmd),
+            len(self.ack_queue) >= self.max_ack_queue
+            # self.bytes_left < len(full_cmd),
             # self.last_idle - time_now() > 1,
             # self.last_loo_rate - time_now() > 1
         ]):
@@ -581,14 +584,6 @@ class TelecortexSession(TelecortexBaseSession):
                 ))
                 self.relinquish()
 
-        # while len(bytes_) > (self.ser_buf_size - self.ser.out_waiting):
-        #     logging.debug("waiting on write out: %d > (%d - %d)" % (
-        #         len(bytes_),
-        #         self.chunk_size,
-        #         self.ser.out_waiting
-        #     ))
-        #     self.relinquish()
-        # self.ser.write(bytes_)
         return bytes_len
 
     def get_line(self):
@@ -613,7 +608,7 @@ class TelecortexSession(TelecortexBaseSession):
     @property
     def bytes_left(self):
         ser_buf_len = self.ser.out_waiting
-        if not self.ignore_acks and len(self.ack_queue) > self.max_ack_queue:
+        if not self.ignore_acks and len(self.ack_queue) >= self.max_ack_queue:
             return 0
         if self.ignore_acks:
             for linenum, ack_cmd in self.ack_queue.items():
@@ -681,8 +676,8 @@ class ThreadedTelecortexSession(TelecortexSession):
         """
         Relinquish control to other sessions.
         """
-        # TODO: actually relinquish
-        time.sleep(0.01)
+        # self.parse_responses()
+        time.sleep(self.sesh_relinquish)
 
 
 class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
@@ -800,7 +795,7 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
                         self.ser_buf_size,
                         self.transport.serial.out_waiting
                     ))
-                    # await self.relinquish_async()
+                    await self.relinquish_async()
         return bytes_len
 
     # def write_line(self, text):

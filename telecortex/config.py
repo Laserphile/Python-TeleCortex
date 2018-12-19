@@ -44,8 +44,8 @@ class TeleCortexConfig(object):
         self.parser.add_argument('--chunk-size', default=230, type=int)
         self.parser.add_argument('--ser-buf-size', default=(230 * 1.2),
                                  type=int)
-        # self.parser.add_argument('--disable-log-file', action='store_false',
-        #                          dest='enable_log_file')
+        self.parser.add_argument('--sesh-relinquish', default=0.001,
+                                 type=float)
         self.parser.add_argument(
             '--config',
             choices=[
@@ -146,7 +146,7 @@ class TeleCortexConfig(object):
             'ignore_acks': self.args.ignore_acks,
             'chunk_size': self.args.chunk_size,
             'ser_buf_size': self.args.ser_buf_size,
-            'manager_relinquish': self.args.manager_relinquish
+            'sesh_relinquish': self.args.sesh_relinquish
         }
 
 
@@ -185,7 +185,13 @@ class TeleCortexManagerConfig(TeleCortexConfig):
             else self.real_manager_class
 
     def setup_manager(self):
-        return self.manager_class(self.servers, **self.session_kwargs)
+        return self.manager_class(self.servers, **self.manager_kwargs)
+
+    @property
+    def manager_kwargs(self):
+        return dict(self.session_kwargs, **{
+            'manager_relinquish': self.args.manager_relinquish
+        })
 
 class TeleCortexThreadManagerConfig(TeleCortexManagerConfig):
     real_manager_class = TelecortexThreadManager
@@ -206,5 +212,5 @@ class TeleCortexAsyncManagerConfig(TeleCortexManagerConfig):
         return self.manager_class(
             self,
             self.graphics,
-            **self.session_kwargs
+            **self.manager_kwargs
         )

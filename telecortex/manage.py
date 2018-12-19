@@ -34,9 +34,10 @@ class TeleCortexBaseManager(object):
     serial_class = serial.Serial
 
     def __init__(self, servers, **kwargs):
+        self.queue_len = kwargs.pop('queue_len', 10)
         self.servers = servers
         self.known_cids = OrderedDict()
-        self.__class__.relinquish_time = kwargs.pop('manager_relinquish', 0.001)
+        self.__class__.manager_relinquish = kwargs.pop('manager_relinquish', 0.001)
         self.session_kwargs = kwargs
 
     @classmethod
@@ -112,6 +113,9 @@ class TeleCortexBaseManager(object):
 
         return response
 
+    @classmethod
+    def relinquish(cls):
+        time.sleep(cls.manager_relinquish)
 
     @property
     def any_alive(self):
@@ -217,18 +221,12 @@ class TelecortexThreadManager(TeleCortexBaseManager):
     """
     session_class = ThreadedTelecortexSession
 
-    queue_length = 10
-
     def __init__(self, servers, **kwargs):
         super(TelecortexThreadManager, self).__init__(servers, **kwargs)
         # A tuple of (queue, proc) for each server_id
         # TODO: split into sesh_workers and cmd_queues
         self.sessions = OrderedDict()
         self.refresh_connections()
-
-    @classmethod
-    def relinquish(cls):
-        time.sleep(cls.relinquish_time)
 
     @classmethod
     def controller_thread(cls, serial_conf, queue_, session_kwargs):
@@ -274,7 +272,7 @@ class TelecortexThreadManager(TeleCortexBaseManager):
 
             if serial_conf:
                 if queue is None:
-                    queue = mp.Queue(self.queue_length)
+                    queue = mp.Queue(self.queue_len)
 
                 proc = ctx.Process(
                     target=self.controller_thread,
@@ -445,7 +443,7 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
         return True
 
     async def relinquish_async(self):
-        await asyncio.sleep(self.relinquish_time)
+        await asyncio.sleep(self.manager_relinquish)
 
     async def wait_for_workers_idle_async(self):
         while not self.all_idle:
