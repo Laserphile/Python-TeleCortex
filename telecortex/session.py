@@ -573,7 +573,7 @@ class TelecortexSession(TelecortexBaseSession):
         while bytes_:
             buf_left = self.ser_buf_size - self.ser.out_waiting
             buf_left = numpy.clip(buf_left, 0, len(bytes_))
-            logging.debug("writing partial: %s" % (repr(bytes_[:buf_left]),))
+            # logging.debug("writing partial: %s" % (repr(bytes_[:buf_left]),))
             self.ser.write(bytes_[:buf_left])
             bytes_ = bytes_[buf_left:]
             if bytes_:
@@ -601,7 +601,7 @@ class TelecortexSession(TelecortexBaseSession):
 
         if self.line_queue:
             line = self.line_queue.popleft()
-            logging.debug("received line: %s" % line)
+            logging.debug("%s received line: %s" % (self.cid, line))
             self.last_line = line
             return line
 
@@ -747,7 +747,7 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
         """
         if self.line_queue:
             line = self.line_queue.popleft()
-            logging.debug("received line: %s" % line)
+            logging.debug("%s received line: %s" % (self.cid, line))
             self.last_line = line
             return line
 
@@ -785,7 +785,7 @@ class TelecortexSerialProtocol(asyncio.Protocol, TelecortexBaseSession):
             while bytes_:
                 buf_left = self.ser_buf_size - self.transport.serial.out_waiting
                 buf_left = numpy.clip(buf_left, 0, len(bytes_))
-                logging.debug("writing partial: %s" % (repr(bytes_[:buf_left]),))
+                # logging.debug("writing partial: %s" % (repr(bytes_[:buf_left]),))
                 self.transport.serial.write(bytes_[:buf_left])
                 bytes_ = bytes_[buf_left:]
 

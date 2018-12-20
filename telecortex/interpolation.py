@@ -114,10 +114,17 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
             lambda x: int(round(x[0])) * image.shape[0] + int(round(x[0])),
             pix_coordinates
         ))
-        pixel_list = image.reshape(
+        pixel_list_raw = image.reshape(
             image.shape[0] * image.shape[1],
             image.shape[2]
         )[pix_coordinates]
+
+        # Fix when image type is BRGA
+        pixel_list = []
+        for pixel_value in pixel_list_raw:
+            if len(pixel_value) > 3:
+                pixel_value = tuple(pixel_value[:3])
+            pixel_list.append(pixel_value)
     else:
         for pix_coordinate in pix_coordinates:
             pixel_value = interpolate_pixel(image, pix_coordinate, interp_type)
@@ -125,6 +132,7 @@ def interpolate_pixel_map(image, pix_map_normalized, interp_type=None):
                 # BGRA fix
                 pixel_value = tuple(pixel_value[:3])
             pixel_list.append(pixel_value)
+
     # logging.debug("pixel_list: %s" % pformat(pixel_list))
     pixel_list = list(itertools.chain(*pixel_list))
     assert len(pixel_list) % 4 == 0

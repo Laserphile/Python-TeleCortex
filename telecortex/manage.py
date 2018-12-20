@@ -19,7 +19,7 @@ from collections import OrderedDict
 import serial
 
 from context import telecortex
-from telecortex.ser import DEFAULT_BAUD, DEFAULT_TIMEOUT
+from telecortex.ser import DEFAULT_BAUD, DEFAULT_TIMEOUT, IGNORE_SERIAL_NO, IGNORE_VID_PID, query_serial_dev
 from telecortex.session import (TelecortexSerialProtocol, TelecortexSession,
                                 ThreadedTelecortexSession,
                                 VirtualTelecortexSession)
@@ -389,12 +389,12 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
         self.loop.set_debug(True)
         self.refresh_connections()
 
-    @classmethod
-    def open_sesh(cls, serial_kwargs, session_kwargs):
-        """
-        @overrides TeleCortexBaseManager.open_sesh.
-        """
-        return
+    # @classmethod
+    # def open_sesh(cls, serial_kwargs, session_kwargs):
+    #     """
+    #     @overrides TeleCortexBaseManager.open_sesh.
+    #     """
+    #     return
 
     def refresh_connections(self, server_ids=None):
         if server_ids is None:
@@ -412,7 +412,9 @@ class TelecortexAsyncManager(TeleCortexBaseManager):
             if server_id in self.sessions:
                 self.sessions[server_id].cancel()
             serial_kwargs = self.get_serial_conf(server_info)
-            serial_url = serial_kwargs.pop('port')
+            serial_url = serial_kwargs.pop('port', None)
+            if serial_url is None:
+                continue
             coro = serial_asyncio.create_serial_connection(
                 self.loop,
                 functools.partial(
